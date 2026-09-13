@@ -43,6 +43,8 @@ export interface AgentStatus {
     windows: { name: string; usedPercent: number; resetsAt: number | null }[]
     status?: 'ok' | 'warning' | 'rejected'
     context?: { used: number; size: number }
+    spend?: { inputTokens: number; outputTokens: number; costUsd?: number; turns: number }
+    provider?: string
     at: number
   } | null
 }

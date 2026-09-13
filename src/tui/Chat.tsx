@@ -184,6 +184,13 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
                 `ctx ${Math.round((100 * status.usage.context.used) / Math.max(1, status.usage.context.size))}%`,
               ]
             : []),
+          ...(status.usage.spend && status.usage.windows.length === 0
+            ? [
+                status.usage.spend.costUsd !== undefined
+                  ? `$${status.usage.spend.costUsd.toFixed(2)}`
+                  : `${Math.round((status.usage.spend.inputTokens + status.usage.spend.outputTokens) / 1000)}k tok`,
+              ]
+            : []),
         ].join(' · ')
       : '',
     status?.error ? `error: ${status.error}` : '',
