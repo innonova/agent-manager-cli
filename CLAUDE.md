@@ -16,7 +16,8 @@ behaviour and update it when a decision changes.
 - Every feature exists as a plain command before it exists in the TUI;
   the TUI is a view over the same client.
 - No dependency the box does not already need, beyond Ink and React
-  themselves and a markdown renderer.
+  themselves, `ws`, `wrap-ansi` (which Ink brings anyway) and a markdown
+  renderer.
 
 ## Stack and commands
 

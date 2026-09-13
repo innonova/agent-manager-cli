@@ -15,9 +15,14 @@ am                       # the TUI
 am help                  # the plain commands
 ```
 
-The login is kept in `~/.config/agent-manager-cli/session.json` (mode
-600). The manager is `http://127.0.0.1:4268` unless `AGENT_MANAGER_URL`
-says otherwise. `docs/design.md` has the decisions and the key bindings.
+`npm run install:cli` writes `~/.local/bin/am`, a wrapper that runs
+`dist/main.js` from this checkout, so `~/.local/bin` must be on your
+PATH and the checkout must stay where it is. The login is kept in
+`~/.config/agent-manager-cli/session.json` (mode 600) and lasts as long
+as the manager's session TTL (30 days by default). The manager is
+`AGENT_MANAGER_URL` if set, else the URL given to `am login --url`, else
+`http://127.0.0.1:4268`. `docs/design.md` has the decisions and the key
+bindings.
 
 ## Newlines in the composer
 

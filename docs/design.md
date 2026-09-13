@@ -34,26 +34,32 @@ shell. Claude Code works over that path, so this does too.
 
 ## Plain commands
 
-`am login`, `logout`, `projects`, `agents <project>`, `new <project>
-<name>`, `tail <agent>` (`--follow` streams, `--full` expands tool output
-and thinking), `turn <agent> <text>`, `allow` / `deny <agent>`,
+`am login [--name] [--url]` (the password from the prompt or
+`AGENT_MANAGER_PASSWORD`), `logout`, `projects`, `agents <project>`,
+`new <project> <name> [--profile] [--ask] [--cwd] [--model] [--effort]`,
+`tail <agent> [--lines N] [--follow] [--full]` (`--follow` streams,
+`--full` expands tool output and thinking), `turn <agent> <text>
+[--steer] [--no-wait]`, `allow <agent> [--option ID]` / `deny <agent>`,
 `interrupt`, `stop`, `features <project>`, `feature <project> <slug>`,
-`respond <project> <slug> <text>`.
+`respond <project> <slug> <text> [--status]`; `am help` (or `-h`) prints
+the usage, `am tui` is the same as `am` alone.
 
 `turn`, `allow` and `deny` print the turn as it runs and return when it
 ends, errors, or stops to ask a permission (`--no-wait` just sends).
 `turn --steer` while a turn runs delivers the message into it, or queues
 it for the next turn where the vendor cannot take one; the TUI's
 composer does the same by itself while the agent works. A
-streaming text item is printed once, when complete. Exit codes: 0, 1 for
-a refused or failed request (the manager's message on stderr), 2 for
-usage.
+streaming text item is printed once, when complete. Exit codes: 0; 1 for
+a refused or failed request (the manager's message on stderr), for a
+turn that ended in an error, and for `tail --follow` losing its login;
+2 for usage, and for `am` without a terminal. A turn that stops for a
+permission or whose event stream is lost exits 0 after saying so.
 
 ## TUI
 
 `am` with no arguments. Three screens: projects, agents of a project,
 and the chat; `Esc` goes back, `q` quits from the pickers, `Ctrl+C`
-always. The chat screen:
+always. Lists take arrows or `j`/`k`, `PageUp`/`PageDown`, `Enter`. The chat screen:
 
 - transcript: the last page from the manager, then live from the event
   stream; `PageUp`/`PageDown` scroll, and reaching the top loads the
@@ -61,7 +67,8 @@ always. The chat screen:
   place; tool calls fold to one line, `Tab` (or `Ctrl+E`) toggles
   expanding tool output and thinking, `End` jumps back to the newest;
 - composer at the bottom: multi-line, `Enter` sends; `Shift+Enter`,
-  `Alt+Enter` or `Ctrl+J` inserts a newline. Most terminals send a bare
+  `Alt+Enter` or `Ctrl+J` inserts a newline; arrows, `Home` and `End`
+  move within it. Most terminals send a bare
   carriage return for Shift+Enter, indistinguishable from Enter, unless
   told to send a distinct sequence; the CSI u form (`ESC [13;2u`) and
   xterm's (`ESC [27;2;13~`) are both accepted, and the README shows the
@@ -73,8 +80,9 @@ always. The chat screen:
   with it still pending and `Tab` brings the focus back;
 - `Ctrl+X` interrupts, `Ctrl+S` stops the session, `Ctrl+N` creates an
   agent (name, profile with `←`/`→`, ask or bypass with `Tab`), `Ctrl+F`
-  opens the project's features (list, `Enter` reads, `r` responds:
-  text, then a status with `←`/`→`, `Enter` sends);
+  opens the project's features (list, `Enter` reads, `PageUp`/`PageDown`
+  scroll the text, `r` responds: text, then a status with `←`/`→`,
+  `Enter` sends; `Esc` closes the open feature, then the screen);
 - header: project and agent, state, model, who else is here and typing,
   the manager's daemon link; the terminal bell rings when a turn ends or
   a permission is asked while another agent is shown.
