@@ -196,7 +196,8 @@ export class Store extends EventEmitter<{ change: [] }> {
     return null
   }
 
-  turn = (agentId: string, text: string) => this.guard(this.api.turn(agentId, text))
+  turn = (agentId: string, text: string, steer = false) =>
+    this.guard(this.api.turn(agentId, text, steer))
   decide = (agentId: string, requestId: string, option: string) =>
     this.guard(this.api.decide(agentId, requestId, option))
   interrupt = (agentId: string) => this.guard(this.api.interrupt(agentId))

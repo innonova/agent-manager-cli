@@ -23,7 +23,8 @@ export const USAGE = `am — terminal client for agent-manager
   am agents <project>
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
   am tail <agent> [--lines N] [--follow] [--full]
-  am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send)
+  am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send;
+                              --steer: while a turn runs, deliver it into the turn or queue it)
   am allow <agent> [--option ID]   answer the pending permission (first allow option by default)
   am deny <agent>             both print the rest of the turn unless --no-wait
   am interrupt <agent>
@@ -330,16 +331,18 @@ async function turn(rest: string[], io: Io): Promise<number> {
   const { values, positionals } = parseArgs({
     args: rest,
     allowPositionals: true,
-    options: { 'no-wait': { type: 'boolean' } },
+    options: { 'no-wait': { type: 'boolean' }, steer: { type: 'boolean' } },
   })
   const api = client()
   const { agent } = await findAgent(api, need(positionals[0], 'agent'))
   const text = positionals.slice(1).join(' ')
   if (!text) throw new Error('a text is required')
   const { total } = await api.items(agent.id, { tail: 0 })
-  await api.turn(agent.id, text)
+  const { mode } = await api.turn(agent.id, text, values.steer)
+  if (mode === 'queued')
+    io.out(dim('queued: the agent cannot take a message mid-turn; sent when it finishes'))
   if (values['no-wait']) {
-    io.out('sent')
+    io.out(mode)
     return 0
   }
   await follow(api, agent, total, io)

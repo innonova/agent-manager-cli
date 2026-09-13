@@ -1,6 +1,6 @@
 ---
 title: terminal client with a chat TUI
-status: review
+status: done
 priority: 50
 ---
 

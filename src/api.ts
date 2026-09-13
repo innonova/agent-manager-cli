@@ -89,8 +89,12 @@ export class Api {
       .join('&')
     return this.call<{ items: StoredItem[]; total: number }>('GET', `/api/agents/${id}/items?${q}`)
   }
-  turn = (id: string, text: string) =>
-    this.call<{ ok: true }>('POST', `/api/agents/${id}/turn`, { text })
+  /** `steer`: while a turn runs, the message goes into it (or is queued) instead of being refused. */
+  turn = (id: string, text: string, steer = false) =>
+    this.call<{ ok: true; mode: 'sent' | 'steered' | 'queued' }>('POST', `/api/agents/${id}/turn`, {
+      text,
+      ...(steer ? { steer: true } : {}),
+    })
   decide = (id: string, requestId: string, option: string) =>
     this.call<{ ok: true }>('POST', `/api/agents/${id}/permission`, { requestId, option })
   interrupt = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/interrupt`, {})

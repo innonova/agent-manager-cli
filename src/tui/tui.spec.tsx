@@ -33,7 +33,14 @@ const worker: AgentRow = {
     model: null,
     effort: null,
   },
-  status: { state: 'idle', error: null, lastActivityAt: 0, background: 0, model: 'fake-1' },
+  status: {
+    state: 'idle',
+    error: null,
+    lastActivityAt: 0,
+    background: 0,
+    model: 'fake-1',
+    queued: 0,
+  },
 }
 const item = (index: number, it: StoredItem['item']): StoredItem => ({
   index,
@@ -67,7 +74,7 @@ function scripted() {
         return { items: history.slice(-(q.tail ?? 200)), total: history.length }
       },
     ),
-    turn: vi.fn(async () => ({ ok: true as const })),
+    turn: vi.fn(async () => ({ ok: true as const, mode: 'sent' as const })),
     decide: vi.fn(async () => ({ ok: true as const })),
     interrupt: vi.fn(async () => ({ ok: true as const })),
     stop: vi.fn(async () => ({ ok: true as const })),
@@ -183,7 +190,7 @@ describe('App', () => {
     await tick()
     r.stdin.write('\r')
     await tick()
-    expect(api.turn).toHaveBeenCalledWith('a1', 'do it')
+    expect(api.turn).toHaveBeenCalledWith('a1', 'do it', false)
   })
 
   it('a permission takes focus, a number answers it, and the bell rings for another agent', async () => {

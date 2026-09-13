@@ -134,8 +134,13 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
   const send = (v: string) => {
     setText('')
     setScrollBack(0)
-    void store.turn(agentId, v).then((r) => {
-      if (r === undefined) setText(v) // refused: keep what was typed
+    const steer = row?.status.state === 'working'
+    void store.turn(agentId, v, steer).then((r) => {
+      if (r === undefined)
+        setText(v) // refused: keep what was typed
+      else if (r.mode === 'queued')
+        store.say('the agent cannot take a message mid-turn; queued for when it finishes')
+      else if (r.mode === 'steered') store.say("steered: seen at the agent's next step")
     })
   }
   const onChange = (v: string) => {
@@ -153,6 +158,7 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
     `${stateMark(state)} ${state}`,
     status?.model ?? '',
     status?.background ? `${status.background} background` : '',
+    status?.queued ? `${status.queued} queued` : '',
     status?.error ? `error: ${status.error}` : '',
     others.length
       ? `here: ${others.map((u) => u.name + (u.typing ? ' (typing…)' : '')).join(', ')}`
@@ -199,7 +205,7 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
           focus={focus && !permFocus}
           placeholder={
             state === 'working'
-              ? 'agent is working (Ctrl+X interrupts)'
+              ? 'agent is working; Enter steers it (seen at its next step), Ctrl+X interrupts'
               : 'type a turn; Enter sends, Shift+Enter or Ctrl+J newline'
           }
         />

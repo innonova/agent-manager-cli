@@ -38,6 +38,7 @@ export interface AgentStatus {
   lastActivityAt: number
   background: number
   model: string | null
+  queued: number
 }
 export interface AgentRow {
   agent: Agent

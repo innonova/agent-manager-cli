@@ -41,7 +41,10 @@ and thinking), `turn <agent> <text>`, `allow` / `deny <agent>`,
 `respond <project> <slug> <text>`.
 
 `turn`, `allow` and `deny` print the turn as it runs and return when it
-ends, errors, or stops to ask a permission (`--no-wait` just sends). A
+ends, errors, or stops to ask a permission (`--no-wait` just sends).
+`turn --steer` while a turn runs delivers the message into it, or queues
+it for the next turn where the vendor cannot take one; the TUI's
+composer does the same by itself while the agent works. A
 streaming text item is printed once, when complete. Exit codes: 0, 1 for
 a refused or failed request (the manager's message on stderr), 2 for
 usage.
