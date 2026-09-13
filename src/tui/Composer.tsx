@@ -12,8 +12,9 @@ export interface ComposerProps {
 }
 
 /**
- * A multi-line input. Enter sends; Alt+Enter or Ctrl+J inserts a newline;
- * pasted text keeps its newlines. Control combinations are left to the
+ * A multi-line input. Enter sends; Shift+Enter, Alt+Enter or Ctrl+J
+ * inserts a newline (Shift+Enter only when the terminal sends a distinct
+ * sequence for it; see the README); pasted text keeps its newlines. Control combinations are left to the
  * screen around it.
  */
 export function Composer({
@@ -34,12 +35,14 @@ export function Composer({
     (input, key) => {
       if (key.ctrl && input !== '\n') return
       if (key.tab || key.escape || key.pageUp || key.pageDown) return
-      if (key.return && !key.meta) {
+      // Shift+Enter (CSI u: return+shift; xterm modifyOtherKeys: raw), Alt+Enter, Ctrl+J
+      const newline =
+        (key.return && (key.shift || key.meta)) || input === '\n' || input === '[27;2;13~'
+      if (newline) return set(value.slice(0, at) + '\n' + value.slice(at), at + 1)
+      if (key.return) {
         if (value.trim()) onSubmit(value)
         return
       }
-      if ((key.return && key.meta) || input === '\n')
-        return set(value.slice(0, at) + '\n' + value.slice(at), at + 1)
       if (key.backspace || (key.delete && at > 0 && !key.meta && input === '')) {
         if (at === 0) return
         return set(value.slice(0, at - 1) + value.slice(at), at - 1)

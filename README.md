@@ -16,3 +16,16 @@ am help                  # the plain commands
 The login is kept in `~/.config/agent-manager-cli/session.json` (mode
 600). The manager is `http://127.0.0.1:4268` unless `AGENT_MANAGER_URL`
 says otherwise. `docs/design.md` has the decisions and the key bindings.
+
+## Newlines in the composer
+
+`Enter` sends. `Ctrl+J` inserts a newline in any terminal. `Shift+Enter`
+does too once the terminal sends a distinct sequence for it; most send a
+plain Enter by default. In Windows Terminal add to `actions` in
+settings.json:
+
+```json
+{ "command": { "action": "sendInput", "input": "\u001b[13;2u" }, "keys": "shift+enter" }
+```
+
+(`Alt+Enter` also works, but Windows Terminal uses it to maximise.)

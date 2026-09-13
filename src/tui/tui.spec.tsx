@@ -125,13 +125,23 @@ describe('Composer', () => {
     await tick()
     r.rerender(view())
     expect(value).toBe('hi\n')
+    r.stdin.write('\x1b[13;2u') // Shift+Enter as a CSI u terminal sends it
+    await tick()
+    r.rerender(view())
+    r.stdin.write('\x1b[27;2;13~') // Shift+Enter as xterm's modifyOtherKeys sends it
+    await tick()
+    r.rerender(view())
+    r.stdin.write('\n') // Ctrl+J
+    await tick()
+    r.rerender(view())
+    expect(value).toBe('hi\n\n\n\n')
     r.stdin.write('there')
     await tick()
     r.rerender(view())
     expect(plain(r.lastFrame())).toContain('there')
     r.stdin.write('\r')
     await tick()
-    expect(onSubmit).toHaveBeenCalledWith('hi\nthere')
+    expect(onSubmit).toHaveBeenCalledWith('hi\n\n\n\nthere')
   })
 })
 

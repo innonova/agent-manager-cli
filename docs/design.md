@@ -57,8 +57,13 @@ always. The chat screen:
   previous page; updates to an item (streaming text) replace it in
   place; tool calls fold to one line, `Tab` (or `Ctrl+E`) toggles
   expanding tool output and thinking, `End` jumps back to the newest;
-- composer at the bottom: multi-line, `Enter` sends, `Alt+Enter` (or
-  `Ctrl+J`) inserts a newline; typing reports presence;
+- composer at the bottom: multi-line, `Enter` sends; `Shift+Enter`,
+  `Alt+Enter` or `Ctrl+J` inserts a newline. Most terminals send a bare
+  carriage return for Shift+Enter, indistinguishable from Enter, unless
+  told to send a distinct sequence; the CSI u form (`ESC [13;2u`) and
+  xterm's (`ESC [27;2;13~`) are both accepted, and the README shows the
+  Windows Terminal binding. `Ctrl+J` works everywhere; typing reports
+  presence;
 - a pending permission takes focus above the composer: arrows or the
   option's number, `Enter` answers, `Esc` returns to the composer with
   it still pending and `Tab` brings the focus back;

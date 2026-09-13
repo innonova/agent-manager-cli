@@ -200,7 +200,7 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
           placeholder={
             state === 'working'
               ? 'agent is working (Ctrl+X interrupts)'
-              : 'type a turn; Enter sends, Alt+Enter newline'
+              : 'type a turn; Enter sends, Shift+Enter or Ctrl+J newline'
           }
         />
       </Box>
