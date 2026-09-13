@@ -1,0 +1,113 @@
+// Mirrors agent-manager's models; see ../agent-manager/docs/design.md.
+export interface User {
+  id: string
+  name: string
+}
+export interface Repo {
+  name: string
+  path: string
+}
+export interface Project {
+  id: string
+  name: string
+  path: string
+  repos: Repo[]
+  defaultProfile: string | null
+  createdAt: number
+}
+export type AgentState =
+  'starting' | 'idle' | 'working' | 'waiting-input' | 'waiting-permission' | 'error' | 'exited'
+export type AgentCounts = Record<AgentState, number>
+export interface Agent {
+  id: string
+  projectId: string
+  name: string
+  profile: string
+  cwd: string
+  vendorConversationId: string | null
+  currentSessionId: string | null
+  createdAt: number
+  archivedAt: number | null
+  permissions: 'bypass' | 'ask'
+  model: string | null
+  effort: string | null
+}
+export interface AgentStatus {
+  state: AgentState
+  error: string | null
+  lastActivityAt: number
+  background: number
+  model: string | null
+}
+export interface AgentRow {
+  agent: Agent
+  status: AgentStatus
+}
+export interface PermissionOption {
+  id: string
+  kind: 'allow' | 'allow-always' | 'deny'
+  label: string
+}
+export type Item =
+  | { kind: 'user'; text: string; by?: string }
+  | { kind: 'text'; text: string; streaming: boolean }
+  | { kind: 'thinking'; text: string }
+  | {
+      kind: 'permission'
+      requestId: string
+      tool: string
+      title: string
+      input: unknown
+      options: PermissionOption[]
+      decision: string | null
+    }
+  | { kind: 'tool_use'; id: string; name: string; input: unknown }
+  | { kind: 'tool_result'; toolUseId: string; output: string; isError: boolean }
+  | { kind: 'error'; message: string }
+  | { kind: 'system'; text: string }
+  | { kind: 'turn_end'; usage?: Record<string, unknown>; costUsd?: number; durationMs?: number }
+export interface StoredItem {
+  index: number
+  sessionId: string
+  at: number
+  seqFrom: number
+  seqTo: number
+  item: Item
+}
+export interface Profile {
+  name: string
+  description?: string
+  supported: boolean
+}
+export type FeatureStatus = 'planned' | 'in-progress' | 'review' | 'blocked' | 'done'
+export interface Feature {
+  slug: string
+  repo: string
+  path: string
+  title: string
+  status: FeatureStatus
+  priority: number
+  dependsOn: string[]
+  body: string
+  mtime: number
+}
+export interface PresenceUser {
+  userId: string
+  name: string
+  typing: boolean
+}
+export type EventFrame =
+  | {
+      type: 'hello'
+      user: string
+      daemon: { connected: boolean }
+      presence?: Record<string, PresenceUser[]>
+    }
+  | { type: 'daemon'; connected: boolean }
+  | { type: 'project.counts'; projectId: string; counts: AgentCounts }
+  | { type: 'agent.state'; agentId: string; projectId: string; status: AgentStatus }
+  | { type: 'agent.item'; agentId: string; item: StoredItem }
+  | { type: 'agent.reset'; agentId: string }
+  | { type: 'feature.changed'; projectId: string; feature: Feature }
+  | { type: 'presence'; agents: Record<string, PresenceUser[]> }
+  | { type: string }

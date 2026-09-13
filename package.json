@@ -1,0 +1,38 @@
+{
+  "name": "agent-manager-cli",
+  "version": "0.1.0",
+  "description": "Terminal client for agent-manager: plain commands and a chat TUI, for working over a bare SSH session",
+  "type": "module",
+  "bin": { "am": "dist/main.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/main.ts",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "lint": "oxlint src/ test/",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"test/**/*.ts\"",
+    "install:cli": "scripts/install-cli.sh"
+  },
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "ink": "^7.1.1",
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0",
+    "react": "^19.3.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/marked-terminal": "^6.1.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/ws": "^8.18.1",
+    "ink-testing-library": "^4.0.0",
+    "oxlint": "^1.58.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.2"
+  }
+}
