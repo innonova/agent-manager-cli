@@ -44,6 +44,8 @@ export interface AgentStatus {
     status?: 'ok' | 'warning' | 'rejected'
     context?: { used: number; size: number }
     spend?: { inputTokens: number; outputTokens: number; costUsd?: number; turns: number }
+    /** The agent's spend across its sessions, once it has been restarted. */
+    total?: { inputTokens: number; outputTokens: number; costUsd?: number; turns: number }
     provider?: string
     at: number
   } | null
