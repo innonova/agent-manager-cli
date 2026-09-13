@@ -17,7 +17,7 @@ export interface Io {
 export const USAGE = `am — terminal client for agent-manager
 
   am                          open the TUI
-  am login [--name NAME] [--url URL]
+  am login [--name NAME] [--url URL]   (AGENT_MANAGER_PASSWORD in the environment skips the prompt)
   am logout
   am projects
   am agents <project>
@@ -202,7 +202,9 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
   } catch (e) {
     io.err(
       e instanceof ApiError
-        ? `${e.message} (${e.status})`
+        ? e.status === 401
+          ? 'not logged in (or the login expired): run `am login`'
+          : `${e.message} (${e.status})`
         : e instanceof Error
           ? e.message
           : String(e),
@@ -219,7 +221,7 @@ function need(v: string | undefined, what: string): string {
 async function login(rest: string[], io: Io): Promise<number> {
   const { values } = parseArgs({
     args: rest,
-    options: { name: { type: 'string' }, url: { type: 'string' }, password: { type: 'string' } },
+    options: { name: { type: 'string' }, url: { type: 'string' } },
   })
   const url = (
     values.url ??
@@ -228,7 +230,8 @@ async function login(rest: string[], io: Io): Promise<number> {
     managerUrl()
   ).replace(/\/$/, '')
   const name = values.name ?? (await io.ask('user: '))
-  const password = values.password ?? (await io.ask('password: ', true))
+  // scripts pass the password in the environment, never on the command line (ps, history)
+  const password = process.env.AGENT_MANAGER_PASSWORD ?? (await io.ask('password: ', true))
   const api = new Api(url)
   const { user } = await api.login(name.trim(), password)
   if (!api.cookie) throw new Error('the manager set no session cookie')
@@ -262,8 +265,7 @@ async function tail(rest: string[], io: Io): Promise<number> {
   for (const s of items) print(s)
   if (!values.follow) return 0
   const events = new Events(api.url, api.cookie!)
-  let next = total
-  await new Promise<void>((resolve, reject) => {
+  await new Promise<void>((resolve) => {
     events.on('error', (e) => {
       io.err(e.message)
       if (/not logged in/.test(e.message)) resolve()
@@ -271,21 +273,22 @@ async function tail(rest: string[], io: Io): Promise<number> {
     events.on('frame', (f: EventFrame) => {
       if (f.type === 'agent.item' && 'agentId' in f && f.agentId === agent.id) {
         const s = (f as { item: StoredItem }).item
-        // an update to an earlier item replaces it in place in the TUI; here it is reprinted
-        if (s.index >= next) next = s.index + 1
         if (s.item.kind === 'text' && s.item.streaming) return // print text once it is complete
         print(s)
       }
-      if (f.type === 'agent.reset') {
-        io.out(dim('· transcript rebuilt by the manager'))
-      }
+      if (f.type === 'agent.reset') io.out(dim('· transcript rebuilt by the manager'))
+    })
+    // items that landed between the snapshot and each (re)connection
+    events.on('open', () => {
+      void api.items(agent.id, { from: total }).then((r) => {
+        for (const s of r.items) if (!(s.item.kind === 'text' && s.item.streaming)) print(s)
+      })
     })
     events.connect()
     process.on('SIGINT', () => {
       events.close()
       resolve()
     })
-    void reject
   })
   return 0
 }
@@ -298,16 +301,17 @@ async function tail(rest: string[], io: Io): Promise<number> {
 async function follow(api: Api, agent: Agent, total: number, io: Io): Promise<void> {
   const events = new Events(api.url, api.cookie!)
   events.on('error', (e) => io.err(e.message))
-  events.connect()
-  await new Promise<void>((r) => events.once('open', r))
-  // anything that landed between the caller's snapshot and the socket opening
-  const missed = await api.items(agent.id, { from: total })
-  let last = total - 1
+  // What each index last printed as: an item updated in place (a stream
+  // ending, an answer recorded) prints again only if its line changed.
+  const printed = new Map<number, string>()
+  let finished = false
   const consider = (s: StoredItem): boolean => {
-    if (s.index <= last && !(s.item.kind === 'text' && !s.item.streaming)) return false
+    if (s.index < total) return false
     if (s.item.kind === 'text' && s.item.streaming) return false // print text once it is complete
-    last = Math.max(last, s.index)
-    io.out(renderItem(s))
+    const line = renderItem(s)
+    if (printed.get(s.index) === line) return false
+    printed.set(s.index, line)
+    io.out(line)
     if (s.item.kind === 'turn_end' || s.item.kind === 'error') return true
     if (s.item.kind === 'permission' && !s.item.decision) {
       io.out(dim(`(answer with: am allow ${agent.name} / am deny ${agent.name})`))
@@ -315,15 +319,30 @@ async function follow(api: Api, agent: Agent, total: number, io: Io): Promise<vo
     }
     return false
   }
-  let finished = false
-  for (const s of missed.items) if (consider(s)) finished = true
-  if (!finished)
-    await new Promise<void>((resolve) => {
-      events.on('frame', (f: EventFrame) => {
-        if (f.type !== 'agent.item' || !('agentId' in f) || f.agentId !== agent.id) return
-        if (consider((f as { item: StoredItem }).item)) resolve()
-      })
+  const done = new Promise<void>((resolve) => {
+    events.on('frame', (f: EventFrame) => {
+      if (f.type !== 'agent.item' || !('agentId' in f) || f.agentId !== agent.id) return
+      if (consider((f as { item: StoredItem }).item)) {
+        finished = true
+        resolve()
+      }
     })
+  })
+  events.connect()
+  const opened = await Promise.race([
+    new Promise<true>((r) => events.once('open', () => r(true))),
+    new Promise<false>((r) => setTimeout(() => r(false), 10_000).unref()),
+  ])
+  if (!opened) {
+    events.close()
+    throw new Error(
+      'the event stream did not open; the turn was sent, follow it with am tail --follow',
+    )
+  }
+  // anything that landed before the socket was listening
+  const missed = await api.items(agent.id, { from: total })
+  for (const s of missed.items) if (consider(s)) finished = true
+  if (!finished) await done
   events.close()
 }
 

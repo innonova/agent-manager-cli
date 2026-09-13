@@ -44,8 +44,15 @@ export async function startBackend(): Promise<Backend> {
       }
       proc.stdout!.on('data', onData)
       proc.stderr!.on('data', onData)
-      proc.on('exit', (code) => reject(new Error(`${what} exited early (${code})`)))
-      setTimeout(() => reject(new Error(`${what} did not start`)), 20000)
+      proc.on('exit', (code) => {
+        clearTimeout(timer)
+        reject(new Error(`${what} exited early (${code})`))
+      })
+      const timer = setTimeout(() => {
+        for (const p of procs) p.kill('SIGKILL')
+        reject(new Error(`${what} did not start`))
+      }, 20000)
+      timer.unref()
     })
   const daemon = spawn(process.execPath, [DAEMON_MAIN], {
     env: {

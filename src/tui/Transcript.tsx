@@ -1,5 +1,4 @@
 import { Box, Text } from 'ink'
-import { useMemo } from 'react'
 import wrapAnsi from 'wrap-ansi'
 import { renderItem, renderToolCall, wrapText } from '../render.js'
 import type { StoredItem } from '../types.js'
@@ -55,12 +54,12 @@ export function transcriptLines(
       const r = results.get(call.id)
       const result = r?.item.kind === 'tool_result' ? r.item : null
       if (r) paired.add(r.index)
-      const key = `tool:${s.index}:${r?.index ?? '-'}:${r?.seqTo ?? ''}:${width}:${expanded}`
+      const key = `tool:${s.sessionId}:${s.index}:${r?.index ?? '-'}:${r?.seqTo ?? ''}:${width}:${expanded}`
       out.push(...wrapped(key, width, () => renderToolCall(s, call, result, expanded)))
       continue
     }
     const it = s.item
-    const key = `${s.index}:${s.seqTo}:${'streaming' in it ? it.streaming : ''}:${'decision' in it ? it.decision : ''}:${width}:${expanded}`
+    const key = `${s.sessionId}:${s.index}:${s.seqTo}:${'streaming' in it ? it.streaming : ''}:${'decision' in it ? it.decision : ''}:${width}:${expanded}`
     out.push(...wrapped(key, width, () => renderItem(s, expanded)))
   }
   return out
@@ -75,10 +74,8 @@ export function Transcript({
   hasEarlier,
   loadingEarlier,
 }: TranscriptProps) {
-  const lines = useMemo(
-    () => transcriptLines(items, width, expanded),
-    [items, width, expanded, items.length],
-  )
+  // the store mutates the array in place; the per-item cache keeps this cheap
+  const lines = transcriptLines(items, width, expanded)
   const end = Math.max(0, lines.length - scrollBack)
   const start = Math.max(0, end - height)
   const visible = lines.slice(start, end)

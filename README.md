@@ -10,7 +10,7 @@ Installing the whole setup from scratch: `../agent-daemon/docs/install.md`.
 ```
 npm install
 npm run install:cli      # builds and links ~/.local/bin/am
-am login                 # the same account as the web UI; asks for the password
+am login                 # the same account as the web UI; asks for the password (or AGENT_MANAGER_PASSWORD in the environment)
 am                       # the TUI
 am help                  # the plain commands
 ```

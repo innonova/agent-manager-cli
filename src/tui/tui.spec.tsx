@@ -221,7 +221,10 @@ describe('App', () => {
     await tick()
     expect(plain(r.lastFrame())).toContain('Remove the build directory')
     expect(plain(r.lastFrame())).toContain('Enter answers')
-    r.stdin.write('2')
+    r.stdin.write('2') // picks, does not answer
+    await tick()
+    expect(api.decide).not.toHaveBeenCalled()
+    r.stdin.write('\r')
     await tick()
     expect(api.decide).toHaveBeenCalledWith('a1', 'req-1', 'deny')
     // another agent finishing while this one is shown: attention and bell

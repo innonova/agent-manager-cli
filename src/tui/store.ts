@@ -62,6 +62,8 @@ export class Store extends EventEmitter<{ change: [] }> {
   current: string | null = null
   /** A one-line message for the footer, cleared by the next one. */
   notice: string | null = null
+  /** Composer text per agent, kept while the screen is elsewhere. */
+  drafts = new Map<string, string>()
   /** Rings the terminal bell; replaced in tests. */
   bell: () => void = () => process.stdout.write('\x07')
 
@@ -152,13 +154,18 @@ export class Store extends EventEmitter<{ change: [] }> {
     this.changed()
   }
 
-  /** Items at and after the transcript's end, after a reconnect or a gap. */
-  private async loadFrom(agentId: string): Promise<void> {
+  /**
+   * Items at and after the transcript's end, after a gap; after a
+   * reconnect also the last few again, since updates to them (a stream
+   * ending, a permission answered) were missed with the socket.
+   */
+  private async loadFrom(agentId: string, overlap = 0): Promise<void> {
     const t = this.transcripts.get(agentId)
     if (!t) return
-    const r = await this.guard(this.api.items(agentId, { from: t.items.length }))
+    const from = Math.max(0, t.items.length - overlap)
+    const r = await this.guard(this.api.items(agentId, { from }))
     if (!r) return
-    if (r.total < t.items.length || (r.items[0]?.index ?? 0) > t.items.length)
+    if (r.total < t.items.length || (r.items[0]?.index ?? from) > t.items.length)
       return this.loadTail(agentId) // renumbered: start over
     if (r.total > t.items.length) t.items.length = r.total
     for (const it of r.items) t.items[it.index] = it
@@ -184,16 +191,17 @@ export class Store extends EventEmitter<{ change: [] }> {
     this.changed()
   }
 
-  /** The permission the shown agent is waiting on, if any. */
+  /** The oldest unanswered permission of the turn under way, if any. */
   pending(agentId: string): StoredItem | null {
     const t = this.transcripts.get(agentId)
     if (!t) return null
-    for (let i = t.items.length - 1; i >= 0 && i >= t.items.length - 50; i--) {
+    let found: StoredItem | null = null
+    for (let i = t.items.length - 1; i >= 0 && i >= t.items.length - 200; i--) {
       const s = t.items[i]
-      if (s?.item.kind === 'permission') return s.item.decision ? null : s
-      if (s?.item.kind === 'turn_end') return null
+      if (s?.item.kind === 'turn_end') break
+      if (s?.item.kind === 'permission' && !s.item.decision) found = s
     }
-    return null
+    return found
   }
 
   turn = (agentId: string, text: string, steer = false) =>
@@ -229,7 +237,7 @@ export class Store extends EventEmitter<{ change: [] }> {
   private async refresh(): Promise<void> {
     await this.loadProjects()
     for (const pid of this.agents.keys()) await this.loadAgents(pid)
-    for (const aid of this.transcripts.keys()) await this.loadFrom(aid)
+    for (const aid of this.transcripts.keys()) await this.loadFrom(aid, 20)
     this.changed()
   }
 

@@ -18,7 +18,9 @@ beforeAll(async () => {
   cfg = fs.mkdtempSync(path.join(os.tmpdir(), 'am-cli-cfg-'))
   process.env.AGENT_MANAGER_CLI_CONFIG_DIR = cfg
   const io: Io = { out: () => undefined, err: (l) => console.error(l), ask: async () => '' }
-  await run(['login', '--url', backend.url, '--name', 'admin', '--password', ADMIN_PASSWORD], io)
+  process.env.AGENT_MANAGER_PASSWORD = ADMIN_PASSWORD
+  await run(['login', '--url', backend.url, '--name', 'admin'], io)
+  delete process.env.AGENT_MANAGER_PASSWORD
   const cookie = JSON.parse(fs.readFileSync(path.join(cfg, 'session.json'), 'utf8')).cookie
   await fetch(`${backend.url}/api/projects`, {
     method: 'POST',
@@ -59,7 +61,7 @@ describe('the TUI in a pseudo-terminal', () => {
       proc.stdin.write('\r')
       await until(/worker/)
       proc.stdin.write('\r')
-      await until(/type a turn/)
+      await until(/Enter sends/)
       proc.stdin.write('hello from the tui')
       await new Promise((r) => setTimeout(r, 100))
       proc.stdin.write('\r')

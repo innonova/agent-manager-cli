@@ -17,6 +17,8 @@ export class Events extends EventEmitter<{
   private closed = false
   private attempt = 0
   private timer: NodeJS.Timeout | null = null
+  /** What was last reported, resent on every (re)connection since the manager forgets a closed socket's. */
+  private last: { agentId: string | null; typing: boolean } | null = null
 
   constructor(
     private readonly url: string,
@@ -32,6 +34,7 @@ export class Events extends EventEmitter<{
     this.ws = ws
     ws.on('open', () => {
       this.attempt = 0
+      if (this.last) ws.send(JSON.stringify({ type: 'presence', ...this.last }))
       this.emit('open')
     })
     ws.on('message', (data) => {
@@ -57,6 +60,7 @@ export class Events extends EventEmitter<{
 
   /** Presence: which agent this user is looking at and whether they are typing. */
   presence(agentId: string | null, typing = false): void {
+    this.last = { agentId, typing }
     if (this.ws?.readyState === WebSocket.OPEN)
       this.ws.send(JSON.stringify({ type: 'presence', agentId, typing }))
   }

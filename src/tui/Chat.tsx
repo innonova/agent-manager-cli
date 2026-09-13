@@ -33,7 +33,7 @@ function Permission({
       else if (key.downArrow || key.rightArrow)
         setCursor((c) => Math.min(item.options.length - 1, c + 1))
       else if (/^[1-9]$/.test(input) && item.options[Number(input) - 1])
-        onAnswer(item.options[Number(input) - 1]!.id)
+        setCursor(Number(input) - 1) // a digit picks; only Enter answers, so a stray key cannot allow
       else if (key.return && item.options[cursor]) onAnswer(item.options[cursor]!.id)
     },
     { isActive: focus },
@@ -72,7 +72,11 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
   const items = t?.items ?? []
   const pending = store.pending(agentId)
   const perm = pending?.item.kind === 'permission' ? pending.item : null
-  const [text, setText] = useState('')
+  const [text, setTextState] = useState(store.drafts.get(agentId) ?? '')
+  const setText = (v: string) => {
+    setTextState(v)
+    store.drafts.set(agentId, v)
+  }
   const [scrollBack, setScrollBack] = useState(0)
   const [expanded, setExpanded] = useState(false)
   const [permFocus, setPermFocus] = useState(false)
@@ -87,9 +91,17 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
     lastPending.current = id
   }, [pending])
 
-  const composerRows = Math.min(6, Math.max(1, text.split('\n').length))
+  const inner = Math.max(10, width - 4) // the composer's box takes border and padding
+  const composerRows = Math.min(
+    6,
+    Math.max(
+      1,
+      text.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / inner)), 0),
+    ),
+  )
+  const permissionRows = perm ? 4 + (perm.input !== undefined && perm.input !== null ? 1 : 0) : 0
   const chrome =
-    2 /* header */ + composerRows + 2 /* composer border */ + 1 /* footer */ + (pending ? 4 : 0)
+    2 /* header */ + composerRows + 2 /* composer border */ + 1 /* footer */ + permissionRows
   const viewHeight = Math.max(3, height - chrome)
   const totalLines = transcriptLines(items, width - 2, expanded).length
 
@@ -205,8 +217,8 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
           focus={focus && !permFocus}
           placeholder={
             state === 'working'
-              ? 'agent is working; Enter steers it (seen at its next step), Ctrl+X interrupts'
-              : 'type a turn; Enter sends, Shift+Enter or Ctrl+J newline'
+              ? 'working; Enter steers (seen at its next step)'
+              : 'Enter sends, Shift+Enter or Ctrl+J newline'
           }
         />
       </Box>

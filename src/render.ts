@@ -4,7 +4,14 @@ import type { Item, StoredItem } from './types.js'
 
 marked.use(markedTerminal({ reflowText: false, tab: 2 }) as never)
 
-const esc = (s: string) => s
+/* oxlint-disable no-control-regex */
+/** Escape sequences other than colours/styles (cursor moves, mode switches, OSC, titles) and stray controls, which tool output may carry and must not reach the terminal. */
+const UNSAFE =
+  /\x1b(?:\[[0-9;?]*[A-Za-z]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[^[\]])|[\x00-\x08\x0b-\x1a\x1c-\x1f\x7f]/g
+const SGR = /^\x1b\[[0-9;]*m$/
+/* oxlint-enable no-control-regex */
+/** Keeps colours and styles, drops every other escape sequence and control character. */
+export const esc = (s: string) => s.replace(UNSAFE, (m) => (SGR.test(m) ? m : ''))
 export const dim = (s: string) => `\x1b[2m${s}\x1b[22m`
 export const bold = (s: string) => `\x1b[1m${s}\x1b[22m`
 export const color = (c: number, s: string) => `\x1b[${c}m${s}\x1b[39m`
@@ -83,11 +90,11 @@ export function renderToolCall(
     : result.isError
       ? color(31, 'error')
       : dim(result.output.length ? `${compact(result.output.length)} chars` : 'no output')
-  const head = `${t} ${color(33, '⚙')} ${bold(call.name)} ${toolSummary(call.name, call.input)}  ${status}`
+  const head = `${t} ${color(33, '⚙')} ${bold(esc(call.name))} ${esc(toolSummary(call.name, call.input))}  ${status}`
   if (!expanded) return head
   const i = (call.input ?? {}) as Record<string, unknown>
   const inputText = str(i.command) || JSON.stringify(call.input, null, 2)
-  const body = [inputText, result ? result.output : ''].filter(Boolean).join('\n')
+  const body = [inputText, result ? result.output : ''].filter(Boolean).map(esc).join('\n')
   return (
     head +
     '\n' +
@@ -110,26 +117,26 @@ export function renderItem(s: StoredItem, full = false): string {
   const it: Item = s.item
   switch (it.kind) {
     case 'user':
-      return `${t} ${color(36, bold(`${it.by ?? 'you'}:`))} ${it.text}`
+      return `${t} ${color(36, bold(`${esc(it.by ?? 'you')}:`))} ${esc(it.text)}`
     case 'text':
-      return `${t} ${markdown(it.text)}${it.streaming ? dim(' ▍') : ''}`
+      return `${t} ${markdown(esc(it.text))}${it.streaming ? dim(' ▍') : ''}`
     case 'thinking':
-      return full ? `${t} ${dim(it.text)}` : `${t} ${dim('(thinking)')}`
+      return full ? `${t} ${dim(esc(it.text))}` : `${t} ${dim('(thinking)')}`
     case 'tool_use':
       return `${t} ${color(33, '⚙')} ${bold(it.name)} ${toolSummary(it.name, it.input)}`
     case 'tool_result':
       return full
-        ? `${t} ${it.isError ? color(31, 'tool error') : dim('tool result')}\n${it.output}`
-        : `${t} ${it.isError ? color(31, '✗ tool error: ' + oneLine(it.output)) : dim('  → ' + oneLine(it.output))}`
+        ? `${t} ${it.isError ? color(31, 'tool error') : dim('tool result')}\n${esc(it.output)}`
+        : `${t} ${it.isError ? color(31, '✗ tool error: ' + oneLine(esc(it.output))) : dim('  → ' + oneLine(esc(it.output)))}`
     case 'permission': {
       const opts = it.options.map((o) => `${o.id}`).join(' / ')
       const status = it.decision ? `answered: ${it.decision}` : `waiting: ${opts}`
       return `${t} ${color(35, `? ${it.title || it.tool}`)} ${dim(status)}`
     }
     case 'error':
-      return `${t} ${color(31, 'error: ' + it.message)}`
+      return `${t} ${color(31, 'error: ' + esc(it.message))}`
     case 'system':
-      return `${t} ${dim('· ' + it.text)}`
+      return `${t} ${dim('· ' + esc(it.text))}`
     case 'turn_end': {
       const bits: string[] = []
       if (it.durationMs !== undefined) bits.push(`${Math.round(it.durationMs / 1000)}s`)

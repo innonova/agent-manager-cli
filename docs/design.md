@@ -68,8 +68,9 @@ always. The chat screen:
   Windows Terminal binding. `Ctrl+J` works everywhere; typing reports
   presence;
 - a pending permission takes focus above the composer: arrows or the
-  option's number, `Enter` answers, `Esc` returns to the composer with
-  it still pending and `Tab` brings the focus back;
+  option's number pick, only `Enter` answers (so a key typed as the
+  prompt appears cannot allow anything), `Esc` returns to the composer
+  with it still pending and `Tab` brings the focus back;
 - `Ctrl+X` interrupts, `Ctrl+S` stops the session, `Ctrl+N` creates an
   agent (name, profile with `←`/`→`, ask or bypass with `Tab`), `Ctrl+F`
   opens the project's features (list, `Enter` reads, `r` responds:
@@ -78,8 +79,10 @@ always. The chat screen:
   the manager's daemon link; the terminal bell rings when a turn ends or
   a permission is asked while another agent is shown.
 
-Nothing here is stored except the login; scroll position, expansion and
-the composer text live for the session.
+Nothing here is stored except the login; the composer text per agent,
+scroll position and expansion live for the session. Vendor-provided text
+(agent output, tool output) is stripped of every escape sequence but
+colours and styles before it reaches the terminal.
 
 ## Testing
 
