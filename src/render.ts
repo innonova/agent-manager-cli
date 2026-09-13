@@ -94,8 +94,12 @@ export function stateMark(state: string): string {
   }
 }
 
-// oxlint-disable-next-line no-control-regex
+/* oxlint-disable no-control-regex */
 const ANSI = /\x1b\[[0-9;]*m/g
+/** Whitespace at the start or end of a line, possibly behind or before a style code. */
+const LEAD = /^((?:\x1b\[[0-9;]*m)*)\s+/
+const TRAIL = /\s+((?:\x1b\[[0-9;]*m)*)$/
+/* oxlint-enable no-control-regex */
 
 /**
  * Wraps one rendered line to `width`, with a hanging indent for list
@@ -111,17 +115,13 @@ export function wrapLine(
   const marker = plain.match(/^(\s*)(?:[-*•]|\d+[.)])\s+/)
   const indent = marker ? marker[0].length : (plain.match(/^\s*/)?.[0].length ?? 0)
   // wrap-ansi leaves the spaces it broke at, sometimes behind a style code
-  const tidy = (l: string) =>
-    l.replace(/^((?:\x1b\[[0-9;]*m)*)\s+/, '$1').replace(/\s+((?:\x1b\[[0-9;]*m)*)$/, '$1')
+  const tidy = (l: string) => l.replace(LEAD, '$1').replace(TRAIL, '$1')
   if (indent === 0 || indent >= width / 2)
     return wrap(line, width)
       .split('\n')
-      .map((l, i) => (i === 0 ? l.replace(/\s+((?:\x1b\[[0-9;]*m)*)$/, '$1') : tidy(l)))
+      .map((l, i) => (i === 0 ? l.replace(TRAIL, '$1') : tidy(l)))
   const [first, ...rest] = wrap(line, width - indent).split('\n')
-  return [
-    (first ?? '').replace(/\s+((?:\x1b\[[0-9;]*m)*)$/, '$1'),
-    ...rest.map((l) => ' '.repeat(indent) + tidy(l)),
-  ]
+  return [(first ?? '').replace(TRAIL, '$1'), ...rest.map((l) => ' '.repeat(indent) + tidy(l))]
 }
 
 /** Wraps rendered text (possibly many lines) to `width`, list items with a hanging indent. */
