@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink'
 import { useEffect, useMemo, useState } from 'react'
 import wrapAnsi from 'wrap-ansi'
-import { markdown } from '../render.js'
+import { markdown, wrapText } from '../render.js'
 import type { Feature, Project } from '../types.js'
 import { Composer } from './Composer.tsx'
 import { List } from './List.tsx'
@@ -40,7 +40,9 @@ export function Features({
   const lines = useMemo(
     () =>
       feature
-        ? wrapAnsi(markdown(feature.body), width - 2, { hard: true, trim: false }).split('\n')
+        ? wrapText(markdown(feature.body), width - 2, (t, w) =>
+            wrapAnsi(t, w, { hard: true, trim: false }),
+          )
         : [],
     [feature, width],
   )

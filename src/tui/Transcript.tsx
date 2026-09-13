@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink'
 import { useMemo } from 'react'
 import wrapAnsi from 'wrap-ansi'
-import { renderItem } from '../render.js'
+import { renderItem, wrapText } from '../render.js'
 import type { StoredItem } from '../types.js'
 
 export interface TranscriptProps {
@@ -24,7 +24,9 @@ function linesOf(s: StoredItem, width: number, expanded: boolean): string[] {
   const hit = cache.get(key)
   if (hit) return hit
   if (cache.size > 5000) cache.clear()
-  const lines = wrapAnsi(renderItem(s, expanded), width, { hard: true, trim: false }).split('\n')
+  const lines = wrapText(renderItem(s, expanded), width, (t, w) =>
+    wrapAnsi(t, w, { hard: true, trim: false }),
+  )
   cache.set(key, lines)
   return lines
 }

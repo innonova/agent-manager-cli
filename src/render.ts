@@ -93,3 +93,42 @@ export function stateMark(state: string): string {
       return dim('○')
   }
 }
+
+// oxlint-disable-next-line no-control-regex
+const ANSI = /\x1b\[[0-9;]*m/g
+
+/**
+ * Wraps one rendered line to `width`, with a hanging indent for list
+ * items: continuation lines of `* item`, `- item` or `1. item` line up
+ * with the item's text rather than its marker.
+ */
+export function wrapLine(
+  line: string,
+  width: number,
+  wrap: (s: string, w: number) => string,
+): string[] {
+  const plain = line.replace(ANSI, '')
+  const marker = plain.match(/^(\s*)(?:[-*•]|\d+[.)])\s+/)
+  const indent = marker ? marker[0].length : (plain.match(/^\s*/)?.[0].length ?? 0)
+  // wrap-ansi leaves the spaces it broke at, sometimes behind a style code
+  const tidy = (l: string) =>
+    l.replace(/^((?:\x1b\[[0-9;]*m)*)\s+/, '$1').replace(/\s+((?:\x1b\[[0-9;]*m)*)$/, '$1')
+  if (indent === 0 || indent >= width / 2)
+    return wrap(line, width)
+      .split('\n')
+      .map((l, i) => (i === 0 ? l.replace(/\s+((?:\x1b\[[0-9;]*m)*)$/, '$1') : tidy(l)))
+  const [first, ...rest] = wrap(line, width - indent).split('\n')
+  return [
+    (first ?? '').replace(/\s+((?:\x1b\[[0-9;]*m)*)$/, '$1'),
+    ...rest.map((l) => ' '.repeat(indent) + tidy(l)),
+  ]
+}
+
+/** Wraps rendered text (possibly many lines) to `width`, list items with a hanging indent. */
+export function wrapText(
+  text: string,
+  width: number,
+  wrap: (s: string, w: number) => string,
+): string[] {
+  return text.split('\n').flatMap((l) => wrapLine(l, width, wrap))
+}
