@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink'
 import { useMemo } from 'react'
 import wrapAnsi from 'wrap-ansi'
-import { renderItem, wrapText } from '../render.js'
+import { renderItem, renderToolCall, wrapText } from '../render.js'
 import type { StoredItem } from '../types.js'
 
 export interface TranscriptProps {
@@ -17,34 +17,51 @@ export interface TranscriptProps {
 
 const cache = new Map<string, string[]>()
 
-/** Wrapped lines for one item, cached by what can change its text. */
-function linesOf(s: StoredItem, width: number, expanded: boolean): string[] {
-  const it = s.item
-  const key = `${s.index}:${s.seqTo}:${'streaming' in it ? it.streaming : ''}:${'decision' in it ? it.decision : ''}:${width}:${expanded}`
+/** Wrapped lines for a rendered item, cached by what can change its text. */
+function wrapped(key: string, width: number, text: () => string): string[] {
   const hit = cache.get(key)
   if (hit) return hit
   if (cache.size > 5000) cache.clear()
-  const lines = wrapText(renderItem(s, expanded), width, (t, w) =>
-    wrapAnsi(t, w, { hard: true, trim: false }),
-  )
+  const lines = wrapText(text(), width, (t, w) => wrapAnsi(t, w, { hard: true, trim: false }))
   cache.set(key, lines)
   return lines
 }
 
-/** All lines of a transcript, for the viewport maths. */
 /** Items that start a new block get a blank line above; tool lines and markers stay attached. */
 const SPACED = new Set(['user', 'text', 'permission', 'error', 'system'])
 
+/**
+ * All lines of a transcript, for the viewport maths. A tool call and its
+ * result fold into one line (the result is shown under the call, not on
+ * its own); a result whose call is not loaded stays a plain item.
+ */
 export function transcriptLines(
   items: (StoredItem | undefined)[],
   width: number,
   expanded: boolean,
 ): string[] {
+  const results = new Map<string, StoredItem>()
+  const paired = new Set<number>()
+  for (const s of items)
+    if (s?.item.kind === 'tool_result' && !results.has(s.item.toolUseId))
+      results.set(s.item.toolUseId, s)
   const out: string[] = []
   for (const s of items) {
     if (!s) continue
+    if (paired.has(s.index)) continue
     if (out.length && SPACED.has(s.item.kind)) out.push('')
-    out.push(...linesOf(s, width, expanded))
+    if (s.item.kind === 'tool_use') {
+      const call = s.item
+      const r = results.get(call.id)
+      const result = r?.item.kind === 'tool_result' ? r.item : null
+      if (r) paired.add(r.index)
+      const key = `tool:${s.index}:${r?.index ?? '-'}:${r?.seqTo ?? ''}:${width}:${expanded}`
+      out.push(...wrapped(key, width, () => renderToolCall(s, call, result, expanded)))
+      continue
+    }
+    const it = s.item
+    const key = `${s.index}:${s.seqTo}:${'streaming' in it ? it.streaming : ''}:${'decision' in it ? it.decision : ''}:${width}:${expanded}`
+    out.push(...wrapped(key, width, () => renderItem(s, expanded)))
   }
   return out
 }

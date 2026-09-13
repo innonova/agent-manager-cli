@@ -28,13 +28,78 @@ function oneLine(v: unknown, max = 100): string {
   return flat.length > max ? flat.slice(0, max - 1) + '…' : flat
 }
 
-/** A tool call as one line: the name and its most telling argument. */
+const str = (v: unknown) => (typeof v === 'string' ? v : '')
+const clip = (s: string, n = 100) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
+
+/**
+ * One line that says what a call is for, as the web UI folds it: Claude's
+ * Bash carries a `description`; file tools a path; search tools a
+ * pattern; the rest fall through to the command or a compact input.
+ */
 export function toolSummary(name: string, input: unknown): string {
   const i = (input ?? {}) as Record<string, unknown>
-  const arg =
-    i.command ?? i.cmd ?? i.file_path ?? i.path ?? i.pattern ?? i.query ?? i.url ?? i.description
-  return arg !== undefined ? `${name} ${oneLine(arg)}` : `${name} ${oneLine(input)}`
+  if (str(i.description)) return str(i.description)
+  switch (name) {
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+    case 'NotebookEdit':
+      return str(i.file_path) || str(i.path)
+    case 'Glob':
+    case 'Grep':
+      return [str(i.pattern), str(i.path)].filter(Boolean).join(' in ')
+    case 'WebFetch':
+    case 'WebSearch':
+      return str(i.url) || str(i.query)
+    case 'Bash':
+    case 'shell':
+      return clip(str(i.command).replace(/\s+/g, ' '))
+    case 'Task':
+    case 'Agent':
+      return str(i.description) || str(i.prompt)
+    default: {
+      const s = JSON.stringify(input)
+      return s && s !== '{}' && s !== 'null' ? clip(s) : ''
+    }
+  }
 }
+
+type ToolUse = Extract<Item, { kind: 'tool_use' }>
+type ToolResult = Extract<Item, { kind: 'tool_result' }>
+
+/**
+ * A tool call and its result as one folded line: what it was for and how
+ * it went. Expanded, the command (or input) and the output follow.
+ */
+export function renderToolCall(
+  s: StoredItem,
+  call: ToolUse,
+  result: ToolResult | null,
+  expanded: boolean,
+): string {
+  const t = dim(clock(s.at))
+  const status = !result
+    ? color(33, 'running…')
+    : result.isError
+      ? color(31, 'error')
+      : dim(result.output.length ? `${compact(result.output.length)} chars` : 'no output')
+  const head = `${t} ${color(33, '⚙')} ${bold(call.name)} ${toolSummary(call.name, call.input)}  ${status}`
+  if (!expanded) return head
+  const i = (call.input ?? {}) as Record<string, unknown>
+  const inputText = str(i.command) || JSON.stringify(call.input, null, 2)
+  const body = [inputText, result ? result.output : ''].filter(Boolean).join('\n')
+  return (
+    head +
+    '\n' +
+    body
+      .split('\n')
+      .map((l) => '    ' + l)
+      .join('\n')
+  )
+}
+
+const compact = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n)
 
 /**
  * Text for one transcript item, as the plain `tail` command prints it and
@@ -51,7 +116,7 @@ export function renderItem(s: StoredItem, full = false): string {
     case 'thinking':
       return full ? `${t} ${dim(it.text)}` : `${t} ${dim('(thinking)')}`
     case 'tool_use':
-      return `${t} ${color(33, '⚙ ' + toolSummary(it.name, it.input))}`
+      return `${t} ${color(33, '⚙')} ${bold(it.name)} ${toolSummary(it.name, it.input)}`
     case 'tool_result':
       return full
         ? `${t} ${it.isError ? color(31, 'tool error') : dim('tool result')}\n${it.output}`
