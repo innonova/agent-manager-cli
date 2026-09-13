@@ -109,7 +109,7 @@ export function Features({
       <Box flexDirection="column" height={bodyHeight}>
         {lines.slice(scroll, scroll + bodyHeight).map((l, i) => (
           <Text key={scroll + i} wrap="truncate-end">
-            {l}
+            {l === '' ? ' ' : l}
           </Text>
         ))}
       </Box>

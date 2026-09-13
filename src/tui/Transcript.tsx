@@ -30,13 +30,20 @@ function linesOf(s: StoredItem, width: number, expanded: boolean): string[] {
 }
 
 /** All lines of a transcript, for the viewport maths. */
+/** Items that start a new block get a blank line above; tool lines and markers stay attached. */
+const SPACED = new Set(['user', 'text', 'permission', 'error', 'system'])
+
 export function transcriptLines(
   items: (StoredItem | undefined)[],
   width: number,
   expanded: boolean,
 ): string[] {
   const out: string[] = []
-  for (const s of items) if (s) out.push(...linesOf(s, width, expanded))
+  for (const s of items) {
+    if (!s) continue
+    if (out.length && SPACED.has(s.item.kind)) out.push('')
+    out.push(...linesOf(s, width, expanded))
+  }
   return out
 }
 
@@ -69,7 +76,7 @@ export function Transcript({
       {note && visible.length < height ? <Text dimColor>{note}</Text> : null}
       {visible.map((l, i) => (
         <Text key={start + i} wrap="truncate-end">
-          {l}
+          {l === '' ? ' ' : l /* an empty text node has no height */}
         </Text>
       ))}
       {lines.length === 0 ? <Text dimColor>No transcript yet.</Text> : null}
