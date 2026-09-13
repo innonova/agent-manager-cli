@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { parseArgs } from 'node:util'
 import readline from 'node:readline'
 import { Api, ApiError } from './api.js'
@@ -5,7 +6,7 @@ import { clearSession, loadSession, managerUrl, saveSession } from './config.js'
 import { client, findAgent, findProject } from './client.js'
 import { Events } from './events.js'
 import { bold, dim, renderItem, stateMark } from './render.js'
-import type { Agent, EventFrame, StoredItem } from './types.js'
+import type { Agent, EventFrame, StoredItem, TurnImage } from './types.js'
 
 export interface Io {
   out: (line: string) => void
@@ -24,7 +25,8 @@ export const USAGE = `am — terminal client for agent-manager
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
   am tail <agent> [--lines N] [--follow] [--full]
   am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send;
-                              --steer: while a turn runs, deliver it into the turn or queue it)
+                              --steer: while a turn runs, deliver it into the turn or queue it;
+                              --image FILE: send an image along, repeatable; png/jpeg/gif/webp)
   am allow <agent> [--option ID]   answer the pending permission (first allow option by default)
   am deny <agent>             both print the rest of the turn unless --no-wait
   am interrupt <agent>
@@ -410,14 +412,19 @@ async function turn(rest: string[], io: Io): Promise<number> {
   const { values, positionals } = parseArgs({
     args: rest,
     allowPositionals: true,
-    options: { 'no-wait': { type: 'boolean' }, steer: { type: 'boolean' } },
+    options: {
+      'no-wait': { type: 'boolean' },
+      steer: { type: 'boolean' },
+      image: { type: 'string', multiple: true },
+    },
   })
   const api = client()
   const { agent } = await findAgent(api, need(positionals[0], 'agent'))
   const text = positionals.slice(1).join(' ')
   if (!text) throw new Error('a text is required')
+  const images = (values.image ?? []).map(readImage)
   const { total } = await api.items(agent.id, { tail: 0 })
-  const { mode } = await api.turn(agent.id, text, values.steer)
+  const { mode } = await api.turn(agent.id, text, values.steer, images)
   if (mode === 'queued') {
     io.out(dim('queued: the agent cannot take a message mid-turn; it is sent when this turn ends'))
     return 0
@@ -471,4 +478,20 @@ async function decide(cmd: 'allow' | 'deny', rest: string[], io: Io): Promise<nu
     return 0
   }
   return (await follow(api, agent, total, io)) === 'error' ? 1 : 0
+}
+
+const IMAGE_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+}
+
+/** An image file for a turn: base64 with the media type from its extension. */
+function readImage(file: string): TurnImage {
+  const ext = file.toLowerCase().split('.').pop() ?? ''
+  const mediaType = IMAGE_TYPES[ext]
+  if (!mediaType) throw new UsageError(`${file}: not a png, jpeg, gif or webp`)
+  return { mediaType, data: fs.readFileSync(file).toString('base64') }
 }

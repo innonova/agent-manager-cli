@@ -6,6 +6,7 @@ import type {
   Profile,
   Project,
   StoredItem,
+  TurnImage,
   User,
 } from './types.js'
 
@@ -90,10 +91,11 @@ export class Api {
     return this.call<{ items: StoredItem[]; total: number }>('GET', `/api/agents/${id}/items?${q}`)
   }
   /** `steer`: while a turn runs, the message goes into it (or is queued) instead of being refused. */
-  turn = (id: string, text: string, steer = false) =>
+  turn = (id: string, text: string, steer = false, images: TurnImage[] = []) =>
     this.call<{ ok: true; mode: 'sent' | 'steered' | 'queued' }>('POST', `/api/agents/${id}/turn`, {
       text,
       ...(steer ? { steer: true } : {}),
+      ...(images.length ? { images } : {}),
     })
   decide = (id: string, requestId: string, option: string) =>
     this.call<{ ok: true }>('POST', `/api/agents/${id}/permission`, { requestId, option })

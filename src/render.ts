@@ -157,8 +157,20 @@ export function renderItem(s: StoredItem, full = false): string {
   const t = dim(clock(s.at))
   const it: Item = s.item
   switch (it.kind) {
-    case 'user':
-      return `${t} ${color(36, bold(`${esc(it.by ?? 'you')}:`))} ${esc(it.text)}`
+    case 'user': {
+      const imgs = it.images?.length
+        ? ' ' +
+          dim(
+            it.images
+              .map(
+                (i) =>
+                  `[image ${i.mediaType.split('/')[1]} ${compact(Math.floor((i.data.length * 3) / 4))} B]`,
+              )
+              .join(' '),
+          )
+        : ''
+      return `${t} ${color(36, bold(`${esc(it.by ?? 'you')}:`))} ${esc(it.text)}${imgs}`
+    }
     case 'text':
       return `${t} ${markdown(esc(it.text))}${it.streaming ? dim(' ▍') : ''}`
     case 'thinking':

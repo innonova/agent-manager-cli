@@ -49,8 +49,12 @@ export interface PermissionOption {
   kind: 'allow' | 'allow-always' | 'deny'
   label: string
 }
+export interface TurnImage {
+  mediaType: string
+  data: string
+}
 export type Item =
-  | { kind: 'user'; text: string; by?: string }
+  | { kind: 'user'; text: string; by?: string; images?: TurnImage[] }
   | { kind: 'text'; text: string; streaming: boolean }
   | { kind: 'thinking'; text: string }
   | {

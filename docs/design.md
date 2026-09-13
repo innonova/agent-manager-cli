@@ -48,7 +48,10 @@ the usage, `am tui` is the same as `am` alone.
 ends, errors, or stops to ask a permission (`--no-wait` just sends).
 `turn --steer` while a turn runs delivers the message into it, or queues
 it for the next turn where the vendor cannot take one; the TUI's
-composer does the same by itself while the agent works. A
+composer does the same by itself while the agent works. `turn --image
+<file>` (repeatable) sends png, jpeg, gif or webp files along; the TUI
+shows a user item's images as `[image png 12k B]` markers, since a
+terminal over SSH can neither paste nor show them. A
 streaming text item is printed once, when complete. Exit codes: 0; 1 for
 a refused or failed request (the manager's message on stderr), for a
 turn that ended in an error, and for `tail --follow` losing its login;
