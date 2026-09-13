@@ -40,7 +40,10 @@ export async function startBackend(): Promise<Backend> {
         if (process.env.TEST_VERBOSE)
           process.stdout.write(String(d).replace(/^(?=.)/gm, `[${what}] `))
         const m = log.match(re)
-        if (m) resolve(m[1]!)
+        if (m) {
+          clearTimeout(timer)
+          resolve(m[1]!)
+        }
       }
       proc.stdout!.on('data', onData)
       proc.stderr!.on('data', onData)

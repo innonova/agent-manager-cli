@@ -149,7 +149,12 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
     const steer = row?.status.state === 'working'
     void store.turn(agentId, v, steer).then((r) => {
       if (r === undefined)
-        setText(v) // refused: keep what was typed
+        setTextState((cur) => {
+          // refused: keep what was typed, unless something new is there already
+          const next = cur === '' ? v : cur
+          store.drafts.set(agentId, next)
+          return next
+        })
       else if (r.mode === 'queued')
         store.say('the agent cannot take a message mid-turn; queued for when it finishes')
       else if (r.mode === 'steered') store.say("steered: seen at the agent's next step")

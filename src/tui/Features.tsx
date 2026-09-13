@@ -32,6 +32,7 @@ export function Features({
   const [scroll, setScroll] = useState(0)
   const [text, setText] = useState('')
   const [statusIdx, setStatusIdx] = useState(0)
+  const [sending, setSending] = useState(false)
   useEffect(() => {
     void store.loadFeatures(project.id)
   }, [store, project.id])
@@ -54,8 +55,10 @@ export function Features({
         if (key.leftArrow || key.upArrow) return setStatusIdx((i) => Math.max(0, i - 1))
         if (key.rightArrow || key.downArrow)
           return setStatusIdx((i) => Math.min(STATUSES.length - 1, i + 1))
-        if (key.return && feature) {
+        if (key.return && feature && !sending) {
+          setSending(true)
           void store.respond(project.id, feature.slug, text, STATUSES[statusIdx]).then((r) => {
+            setSending(false)
             if (!r) return
             setText('')
             setMode('read')
@@ -97,7 +100,7 @@ export function Features({
             setMode('read')
           }}
         />
-        <Text dimColor>Enter opens · Esc back</Text>
+        <Text dimColor>{store.notice ?? 'Enter opens · Esc back'}</Text>
       </Box>
     )
   return (
@@ -116,7 +119,7 @@ export function Features({
         ))}
       </Box>
       {mode === 'read' ? (
-        <Text dimColor>PgUp/PgDn scroll · r respond · Esc back</Text>
+        <Text dimColor>{store.notice ?? 'PgUp/PgDn scroll · r respond · Esc back'}</Text>
       ) : (
         <Box flexDirection="column">
           <Box borderStyle="round" borderColor={mode === 'respond' ? 'blue' : 'gray'} paddingX={1}>

@@ -42,8 +42,8 @@ export function transcriptLines(
   const results = new Map<string, StoredItem>()
   const paired = new Set<number>()
   for (const s of items)
-    if (s?.item.kind === 'tool_result' && !results.has(s.item.toolUseId))
-      results.set(s.item.toolUseId, s)
+    if (s?.item.kind === 'tool_result' && !results.has(`${s.sessionId}:${s.item.toolUseId}`))
+      results.set(`${s.sessionId}:${s.item.toolUseId}`, s)
   const out: string[] = []
   for (const s of items) {
     if (!s) continue
@@ -51,7 +51,7 @@ export function transcriptLines(
     if (out.length && SPACED.has(s.item.kind)) out.push('')
     if (s.item.kind === 'tool_use') {
       const call = s.item
-      const r = results.get(call.id)
+      const r = results.get(`${s.sessionId}:${call.id}`)
       const result = r?.item.kind === 'tool_result' ? r.item : null
       if (r) paired.add(r.index)
       const key = `tool:${s.sessionId}:${s.index}:${r?.index ?? '-'}:${r?.seqTo ?? ''}:${width}:${expanded}`
@@ -76,7 +76,8 @@ export function Transcript({
 }: TranscriptProps) {
   // the store mutates the array in place; the per-item cache keeps this cheap
   const lines = transcriptLines(items, width, expanded)
-  const end = Math.max(0, lines.length - scrollBack)
+  const back = Math.min(scrollBack, Math.max(0, lines.length - height)) // the transcript may have shrunk (a fold)
+  const end = Math.max(0, lines.length - back)
   const start = Math.max(0, end - height)
   const visible = lines.slice(start, end)
   const note =

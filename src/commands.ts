@@ -200,6 +200,10 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         return 2
     }
   } catch (e) {
+    if (e instanceof UsageError || (e instanceof TypeError && /option|argument/i.test(e.message))) {
+      io.err(`${e.message}\n\n${USAGE}`)
+      return 2
+    }
     io.err(
       e instanceof ApiError
         ? e.status === 401
@@ -213,8 +217,9 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
   }
 }
 
+class UsageError extends Error {}
 function need(v: string | undefined, what: string): string {
-  if (!v) throw new Error(`${what} is required`)
+  if (!v) throw new UsageError(`${what} is required`)
   return v
 }
 
@@ -265,24 +270,36 @@ async function tail(rest: string[], io: Io): Promise<number> {
   for (const s of items) print(s)
   if (!values.follow) return 0
   const events = new Events(api.url, api.cookie!)
+  let lost = false
   await new Promise<void>((resolve) => {
     events.on('error', (e) => {
       io.err(e.message)
-      if (/not logged in/.test(e.message)) resolve()
+      if (/not logged in/.test(e.message)) {
+        lost = true
+        resolve()
+      }
     })
+    let from = Math.max(0, total - n) // refetched on each connection: updates to the last items too
     events.on('frame', (f: EventFrame) => {
       if (f.type === 'agent.item' && 'agentId' in f && f.agentId === agent.id) {
         const s = (f as { item: StoredItem }).item
         if (s.item.kind === 'text' && s.item.streaming) return // print text once it is complete
         print(s)
+        from = Math.max(from, s.index - n)
       }
-      if (f.type === 'agent.reset') io.out(dim('· transcript rebuilt by the manager'))
+      if (f.type === 'agent.reset') {
+        io.out(dim('· transcript rebuilt by the manager'))
+        shown.clear()
+        from = 0
+      }
     })
-    // items that landed between the snapshot and each (re)connection
     events.on('open', () => {
-      void api.items(agent.id, { from: total }).then((r) => {
-        for (const s of r.items) if (!(s.item.kind === 'text' && s.item.streaming)) print(s)
-      })
+      void api
+        .items(agent.id, { from })
+        .then((r) => {
+          for (const s of r.items) if (!(s.item.kind === 'text' && s.item.streaming)) print(s)
+        })
+        .catch((e: Error) => io.err(e.message))
     })
     events.connect()
     process.on('SIGINT', () => {
@@ -290,7 +307,8 @@ async function tail(rest: string[], io: Io): Promise<number> {
       resolve()
     })
   })
-  return 0
+  events.close()
+  return lost ? 1 : 0
 }
 
 /**
@@ -298,52 +316,94 @@ async function tail(rest: string[], io: Io): Promise<number> {
  * errors or stops to ask a permission. `total` is the index the turn's
  * items start at.
  */
-async function follow(api: Api, agent: Agent, total: number, io: Io): Promise<void> {
+/**
+ * Prints the items of the turn under way as they arrive, until it ends
+ * (a turn end, an error, the session ending) or stops to ask a
+ * permission. `total` is the index the turn's items start at. Each
+ * (re)connection refetches from there, so nothing is missed in a gap;
+ * an item updated in place prints again only if its line changed, and a
+ * text identical to the one just printed (Claude finalises a text twice)
+ * is not repeated.
+ */
+async function follow(
+  api: Api,
+  agent: Agent,
+  total: number,
+  io: Io,
+): Promise<'ended' | 'error' | 'permission' | 'lost'> {
   const events = new Events(api.url, api.cookie!)
-  events.on('error', (e) => io.err(e.message))
-  // What each index last printed as: an item updated in place (a stream
-  // ending, an answer recorded) prints again only if its line changed.
   const printed = new Map<number, string>()
-  let finished = false
-  const consider = (s: StoredItem): boolean => {
-    if (s.index < total) return false
-    if (s.item.kind === 'text' && s.item.streaming) return false // print text once it is complete
+  let lastText = ''
+  let outcome: 'ended' | 'error' | 'permission' | 'lost' | null = null
+  const settle = (o: typeof outcome) => (outcome ??= o)
+  const consider = (s: StoredItem): void => {
+    if (s.index < total) return
+    if (s.item.kind === 'text' && s.item.streaming) return // print text once it is complete
     const line = renderItem(s)
-    if (printed.get(s.index) === line) return false
+    if (printed.get(s.index) === line) return
     printed.set(s.index, line)
-    io.out(line)
-    if (s.item.kind === 'turn_end' || s.item.kind === 'error') return true
-    if (s.item.kind === 'permission' && !s.item.decision) {
-      io.out(dim(`(answer with: am allow ${agent.name} / am deny ${agent.name})`))
-      return true
+    if (s.item.kind === 'text') {
+      if (s.item.text === lastText) return
+      lastText = s.item.text
     }
-    return false
+    io.out(line)
+    if (s.item.kind === 'turn_end') settle('ended')
+    else if (s.item.kind === 'error') settle('error')
+    else if (s.item.kind === 'system' && s.item.text.startsWith('session ended')) settle('ended')
+    else if (s.item.kind === 'permission' && !s.item.decision) {
+      io.out(dim(`(answer with: am allow ${agent.name} / am deny ${agent.name})`))
+      settle('permission')
+    }
   }
   const done = new Promise<void>((resolve) => {
+    const check = () => outcome && resolve()
     events.on('frame', (f: EventFrame) => {
+      if (f.type === 'agent.reset') {
+        io.out(dim('· the transcript was rebuilt by the manager; follow it with am tail --follow'))
+        settle('lost')
+        return check()
+      }
       if (f.type !== 'agent.item' || !('agentId' in f) || f.agentId !== agent.id) return
-      if (consider((f as { item: StoredItem }).item)) {
-        finished = true
-        resolve()
+      consider((f as { item: StoredItem }).item)
+      check()
+    })
+    // each (re)connection: whatever landed while we were not listening
+    events.on('open', () => {
+      void api
+        .items(agent.id, { from: total })
+        .then((r) => {
+          for (const s of r.items) consider(s)
+          check()
+        })
+        .catch((e: Error) => {
+          io.err(e.message)
+          settle('lost')
+          check()
+        })
+    })
+    events.on('error', (e) => {
+      io.err(e.message)
+      if (/not logged in/.test(e.message)) {
+        settle('lost')
+        check()
       }
     })
   })
-  events.connect()
-  const opened = await Promise.race([
-    new Promise<true>((r) => events.once('open', () => r(true))),
-    new Promise<false>((r) => setTimeout(() => r(false), 10_000).unref()),
-  ])
-  if (!opened) {
+  try {
+    events.connect()
+    const opened = await Promise.race([
+      new Promise<true>((r) => events.once('open', () => r(true))),
+      new Promise<false>((r) => setTimeout(() => r(false), 10_000).unref()),
+    ])
+    if (!opened && !outcome) {
+      io.err('the event stream did not open; the turn was sent, follow it with am tail --follow')
+      return 'lost'
+    }
+    await done
+    return outcome ?? 'lost'
+  } finally {
     events.close()
-    throw new Error(
-      'the event stream did not open; the turn was sent, follow it with am tail --follow',
-    )
   }
-  // anything that landed before the socket was listening
-  const missed = await api.items(agent.id, { from: total })
-  for (const s of missed.items) if (consider(s)) finished = true
-  if (!finished) await done
-  events.close()
 }
 
 async function turn(rest: string[], io: Io): Promise<number> {
@@ -358,14 +418,15 @@ async function turn(rest: string[], io: Io): Promise<number> {
   if (!text) throw new Error('a text is required')
   const { total } = await api.items(agent.id, { tail: 0 })
   const { mode } = await api.turn(agent.id, text, values.steer)
-  if (mode === 'queued')
-    io.out(dim('queued: the agent cannot take a message mid-turn; sent when it finishes'))
+  if (mode === 'queued') {
+    io.out(dim('queued: the agent cannot take a message mid-turn; it is sent when this turn ends'))
+    return 0
+  }
   if (values['no-wait']) {
     io.out(mode)
     return 0
   }
-  await follow(api, agent, total, io)
-  return 0
+  return (await follow(api, agent, total, io)) === 'error' ? 1 : 0
 }
 
 async function decide(cmd: 'allow' | 'deny', rest: string[], io: Io): Promise<number> {
@@ -376,8 +437,17 @@ async function decide(cmd: 'allow' | 'deny', rest: string[], io: Io): Promise<nu
   })
   const api = client()
   const { agent } = await findAgent(api, need(positionals[0], 'agent'))
-  const { items, total } = await api.items(agent.id, { tail: 50 })
-  const pending = [...items].reverse().find((s) => s.item.kind === 'permission' && !s.item.decision)
+  const { items, total } = await api.items(agent.id, { tail: 200 })
+  const pendingOf = (list: StoredItem[]) => {
+    const open: StoredItem[] = []
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = list[i]!
+      if (s.item.kind === 'turn_end' || s.item.kind === 'error') break
+      if (s.item.kind === 'permission' && !s.item.decision) open.unshift(s)
+    }
+    return open
+  }
+  const pending = pendingOf(items)[0]
   if (!pending || pending.item.kind !== 'permission') throw new Error('no permission is pending')
   const option =
     values.option ??
@@ -388,6 +458,17 @@ async function decide(cmd: 'allow' | 'deny', rest: string[], io: Io): Promise<nu
     )
   await api.decide(agent.id, pending.item.requestId, option)
   io.out(`${pending.item.title || pending.item.tool}: ${option}`)
-  if (!values['no-wait']) await follow(api, agent, total, io)
-  return 0
+  if (values['no-wait']) return 0
+  const still = pendingOf((await api.items(agent.id, { tail: 200 })).items).filter(
+    (s) => s.index !== pending.index,
+  )
+  if (still.length) {
+    io.out(
+      dim(
+        `${still.length} more permission(s) pending: am allow ${agent.name} / am deny ${agent.name}`,
+      ),
+    )
+    return 0
+  }
+  return (await follow(api, agent, total, io)) === 'error' ? 1 : 0
 }

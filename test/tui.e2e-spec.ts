@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterAll, beforeAll, describe, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ADMIN_PASSWORD, startBackend, type Backend } from './backend.js'
 import { run, type Io } from '../src/commands.js'
 
@@ -68,7 +68,12 @@ describe('the TUI in a pseudo-terminal', () => {
       await until(/You said: hello from the tui/)
       await until(/turn end/)
       proc.stdin.write('\x03') // Ctrl+C
-      await new Promise((r) => setTimeout(r, 300))
+      const exited = await Promise.race([
+        new Promise<boolean>((r) => proc.once('exit', () => r(true))),
+        new Promise<boolean>((r) => setTimeout(() => r(false), 3000)),
+      ])
+      expect(exited).toBe(true)
+      expect(out).toContain('\x1b[?1049l') // back from the alternate screen
     } finally {
       proc.kill('SIGKILL')
     }

@@ -14,10 +14,15 @@ export async function tui(io: Io): Promise<number> {
   const events = new Events(api.url, api.cookie!)
   const store = new Store(api, events)
   process.stdout.write('\x1b[?1049h\x1b[H') // alternate screen: the shell's scrollback stays clean
-  const app = render(<App store={store} />, { exitOnCtrlC: true })
-  store.start()
+  let app: ReturnType<typeof render> | null = null
   try {
+    app = render(<App store={store} />, { exitOnCtrlC: true })
+    store.start()
     await app.waitUntilExit()
+  } catch (e) {
+    app?.unmount()
+    io.err(e instanceof Error ? e.message : String(e))
+    return 1
   } finally {
     events.close()
     process.stdout.write('\x1b[?1049l')

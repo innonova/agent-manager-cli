@@ -49,7 +49,7 @@ export function Composer({
       }
       if (key.leftArrow) return setCursor(Math.max(0, at - 1))
       if (key.rightArrow) return setCursor(Math.min(value.length, at + 1))
-      if (key.home) return setCursor(value.lastIndexOf('\n', at - 1) + 1)
+      if (key.home) return setCursor(at === 0 ? 0 : value.lastIndexOf('\n', at - 1) + 1)
       if (key.end) {
         const nl = value.indexOf('\n', at)
         return setCursor(nl < 0 ? value.length : nl)

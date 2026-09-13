@@ -76,3 +76,30 @@ describe('folded tool calls', async () => {
     ).toContain('error')
   })
 })
+
+describe('esc', async () => {
+  const { esc, splitStyled } = await import('./render.js')
+  it('keeps colours and styles and strips everything a terminal would act on', () => {
+    expect(esc('\x1b[1mbold\x1b[22m \x1b[31;1mred\x1b[0m')).toBe(
+      '\x1b[1mbold\x1b[22m \x1b[31;1mred\x1b[0m',
+    )
+    expect(esc('a\x1b[2Jb')).toBe('ab') // clear screen
+    expect(esc('a\x1b[?1049lb')).toBe('ab') // leave the alternate screen
+    expect(esc('a\x1b]0;title\x07b')).toBe('ab') // OSC title
+    expect(esc('a\x1b]52;c;aGk=\x1b\\b')).toBe('ab') // OSC clipboard, ST-terminated
+    expect(esc('a\x1bPq#0\x1b\\b')).toBe('ab') // DCS
+    expect(esc('a\x9b2Jb')).toBe('a2Jb') // C1 CSI: the introducer goes, the rest is inert text
+    expect(esc('a\x1b[\x002Jb')).toBe('a2Jb') // the NUL trick: the introducer goes first, the rest is inert
+    expect(esc('a\x1b[ qb')).toBe('ab') // CSI with an intermediate
+    expect(esc('a\x1b')).toBe('a') // a stray ESC
+    expect(esc('a\x1b(Bb')).toBe('ab') // charset switch
+    expect(esc('tab\tand\nnewline')).toBe('tab\tand\nnewline')
+  })
+  it('re-opens active styles on each line', () => {
+    expect(splitStyled('\x1b[31mred\nstill red\x1b[0m\nplain')).toEqual([
+      '\x1b[31mred',
+      '\x1b[31mstill red\x1b[0m',
+      'plain',
+    ])
+  })
+})

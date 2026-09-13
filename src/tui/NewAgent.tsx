@@ -72,7 +72,7 @@ export function NewAgent({
           : '…'}
       </Text>
       <Text>permissions (Tab): {ask ? '[ask]  bypass ' : ' ask  [bypass]'}</Text>
-      <Text dimColor>{busy ? 'starting…' : 'Enter creates · Esc cancels'}</Text>
+      <Text dimColor>{busy ? 'starting…' : (store.notice ?? 'Enter creates · Esc cancels')}</Text>
     </Box>
   )
 }
