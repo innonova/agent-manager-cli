@@ -5,6 +5,8 @@ commands for any shell and a chat TUI, so agents can be driven from an
 SSH session when the browser cannot reach the manager (no tunnels, nothing
 installable on the connecting side).
 
+Installing the whole setup from scratch: `../agent-daemon/docs/install.md`.
+
 ```
 npm install
 npm run install:cli      # builds and links ~/.local/bin/am
