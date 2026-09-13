@@ -4,6 +4,8 @@
     "moduleResolution": "nodenext",
     "target": "ES2023",
     "jsx": "react-jsx",
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,

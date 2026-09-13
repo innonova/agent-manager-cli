@@ -70,7 +70,7 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
     switch (cmd) {
       case undefined:
       case 'tui':
-        return await (await import('./tui/index.js')).tui(io)
+        return await (await import('./tui/index.tsx')).tui(io)
       case 'help':
       case '--help':
       case '-h':
