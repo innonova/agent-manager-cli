@@ -39,6 +39,12 @@ export interface AgentStatus {
   background: number
   model: string | null
   queued: number
+  usage: {
+    windows: { name: string; usedPercent: number; resetsAt: number | null }[]
+    status?: 'ok' | 'warning' | 'rejected'
+    context?: { used: number; size: number }
+    at: number
+  } | null
 }
 export interface AgentRow {
   agent: Agent

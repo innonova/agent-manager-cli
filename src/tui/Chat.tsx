@@ -176,6 +176,16 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
     status?.model ?? '',
     status?.background ? `${status.background} background` : '',
     status?.queued ? `${status.queued} queued` : '',
+    status?.usage
+      ? [
+          ...status.usage.windows.map((w) => `${w.name} ${w.usedPercent}%`),
+          ...(status.usage.context
+            ? [
+                `ctx ${Math.round((100 * status.usage.context.used) / Math.max(1, status.usage.context.size))}%`,
+              ]
+            : []),
+        ].join(' · ')
+      : '',
     status?.error ? `error: ${status.error}` : '',
     others.length
       ? `here: ${others.map((u) => u.name + (u.typing ? ' (typing…)' : '')).join(', ')}`

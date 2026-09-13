@@ -107,6 +107,9 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
           const extra = [
             status.model,
             status.background ? `${status.background} bg` : '',
+            status.usage
+              ? status.usage.windows.map((w) => `${w.name} ${w.usedPercent}%`).join(' ')
+              : '',
             status.error,
           ]
             .filter(Boolean)

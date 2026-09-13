@@ -40,6 +40,7 @@ const worker: AgentRow = {
     background: 0,
     model: 'fake-1',
     queued: 0,
+    usage: null,
   },
 }
 const item = (index: number, it: StoredItem['item']): StoredItem => ({
