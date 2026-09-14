@@ -35,7 +35,13 @@ shell. Claude Code works over that path, so this does too.
 ## Plain commands
 
 `am login [--name] [--url]` (the password from the prompt or
-`AGENT_MANAGER_PASSWORD`), `logout`, `projects`, `agents <project>`,
+`AGENT_MANAGER_PASSWORD`), `logout`, `projects`, `project new <name>
+<repo-path>... [--profile] [--host]` (the paths as on the manager's
+machine; relative ones are resolved here, which is that machine unless
+`--host` names a spoke), `project add-repo <project> <repo-path>...`
+(sends the whole list back, so existing names stay), `project restart
+<project>` (the idle agents, so they see the repos; busy ones are
+listed as skipped), `agents <project>`,
 `new <project> <name> [--profile] [--ask] [--cwd] [--model] [--effort]`,
 `tail <agent> [--lines N] [--follow] [--full]` (`--follow` streams,
 `--full` expands tool output and thinking), `turn <agent> <text>

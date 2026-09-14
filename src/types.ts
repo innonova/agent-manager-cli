@@ -14,6 +14,8 @@ export interface Project {
   repos: Repo[]
   defaultProfile: string | null
   createdAt: number
+  /** The machine it is on, when the manager is a hub. */
+  host?: string
 }
 export type AgentState =
   'starting' | 'idle' | 'working' | 'waiting-input' | 'waiting-permission' | 'error' | 'exited'

@@ -63,6 +63,28 @@ export class Api {
   projects = () =>
     this.call<{ project: Project; agentCounts: Record<string, number> }[]>('GET', '/api/projects')
   project = (id: string) => this.call<{ project: Project }>('GET', `/api/projects/${id}`)
+  /** Repos are absolute paths on the manager's machine (or the named host's, on a hub). */
+  createProject = (input: {
+    name: string
+    repos: { name?: string; path: string }[]
+    defaultProfile?: string
+    host?: string
+  }) => this.call<{ project: Project }>('POST', '/api/projects', input)
+  updateProject = (
+    id: string,
+    input: {
+      name?: string
+      repos?: { name?: string; path: string }[]
+      defaultProfile?: string | null
+    },
+  ) => this.call<{ project: Project }>('PATCH', `/api/projects/${id}`, input)
+  /** Stops and resumes the project's idle agents so they see changed settings; busy ones are skipped. */
+  restartAgents = (projectId: string) =>
+    this.call<{ restarted: string[]; skipped: { id: string; why: string }[] }>(
+      'POST',
+      `/api/projects/${projectId}/agents/restart`,
+      {},
+    )
   agents = (projectId: string) => this.call<AgentRow[]>('GET', `/api/projects/${projectId}/agents`)
   agent = (id: string) =>
     this.call<{ agent: Agent; status: AgentStatus; sessions: unknown[] }>(

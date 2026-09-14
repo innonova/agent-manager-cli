@@ -113,4 +113,33 @@ describe('plain commands', () => {
     expect((await am(['logout'])).text).toContain('logged out')
     expect((await am(['projects'])).err[0]).toMatch(/not logged in/)
   })
+
+  it('creates a project with several repos, adds one later and restarts its agents', async () => {
+    process.env.AGENT_MANAGER_PASSWORD = ADMIN_PASSWORD
+    expect((await am(['login', '--name', 'admin', '--url', backend.url])).code).toBe(0)
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'am-cli-repos-'))
+    for (const n of ['alpha', 'beta', 'gamma']) fs.mkdirSync(path.join(base, n))
+    const made = await am([
+      'project',
+      'new',
+      'multi',
+      path.join(base, 'alpha'),
+      path.join(base, 'beta'),
+    ])
+    expect(made.code).toBe(0)
+    expect(made.text).toContain('alpha')
+    expect(made.text).toContain('beta')
+    const added = await am(['project', 'add-repo', 'multi', path.join(base, 'gamma')])
+    expect(added.code).toBe(0)
+    expect(added.out.filter((l) => /alpha|beta|gamma/.test(l))).toHaveLength(3)
+    const listed = await am(['projects'])
+    expect(listed.text).toContain(path.join(base, 'gamma'))
+    const restarted = await am(['project', 'restart', 'multi'])
+    expect(restarted.code).toBe(0)
+    expect(restarted.text).toContain('restarted 0 agents')
+    const bad = await am(['project', 'add-repo', 'multi', path.join(base, 'missing')])
+    expect(bad.code).toBe(1)
+    expect(bad.err[0]).toMatch(/not a directory/)
+    expect((await am(['project'])).code).toBe(2)
+  })
 })

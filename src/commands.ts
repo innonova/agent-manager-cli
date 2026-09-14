@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { parseArgs } from 'node:util'
+import path from 'node:path'
 import readline from 'node:readline'
 import { Api, ApiError } from './api.js'
 import { clearSession, loadSession, managerUrl, saveSession } from './config.js'
@@ -21,6 +22,9 @@ export const USAGE = `am — terminal client for agent-manager
   am login [--name NAME] [--url URL]   (AGENT_MANAGER_PASSWORD in the environment skips the prompt)
   am logout
   am projects
+  am project new <name> <repo-path>... [--profile P] [--host H]   (paths as on the manager's machine)
+  am project add-repo <project> <repo-path>...
+  am project restart <project>   restart the idle agents so they see the new repos
   am agents <project>
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
   am tail <agent> [--lines N] [--follow] [--full]
@@ -100,6 +104,8 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         }
         return 0
       }
+      case 'project':
+        return await project(rest, io)
       case 'agents': {
         const api = client()
         const project = await findProject(api, need(rest[0], 'project'))
@@ -226,6 +232,63 @@ class UsageError extends Error {}
 function need(v: string | undefined, what: string): string {
   if (!v) throw new UsageError(`${what} is required`)
   return v
+}
+
+/** Repo paths as the manager wants them: absolute on its machine. Relative ones are taken from here when the manager is local. */
+function repoPaths(raw: string[], remote: boolean): { path: string }[] {
+  if (!raw.length) throw new UsageError('at least one repo path is required')
+  return raw.map((p) => {
+    if (remote && !path.isAbsolute(p))
+      throw new UsageError(`repo paths on another host must be absolute: ${p}`)
+    return { path: path.resolve(p) }
+  })
+}
+
+async function project(rest: string[], io: Io): Promise<number> {
+  const [sub, ...args] = rest
+  const api = client()
+  switch (sub) {
+    case 'new': {
+      const { values, positionals } = parseArgs({
+        args,
+        allowPositionals: true,
+        options: { profile: { type: 'string' }, host: { type: 'string' } },
+      })
+      const [name, ...repos] = positionals
+      const { project } = await api.createProject({
+        name: need(name, 'name'),
+        repos: repoPaths(repos, values.host !== undefined),
+        ...(values.profile ? { defaultProfile: values.profile } : {}),
+        ...(values.host ? { host: values.host } : {}),
+      })
+      io.out(`${bold(project.name)}  ${dim(project.id)}`)
+      for (const r of project.repos) io.out(`  ${r.name}  ${dim(r.path)}`)
+      return 0
+    }
+    case 'add-repo': {
+      const [ref, ...repos] = args
+      const current = await findProject(api, need(ref, 'project'))
+      // the whole list goes back: existing names stay, the new ones are named by the manager
+      const { project } = await api.updateProject(current.id, {
+        repos: [...current.repos, ...repoPaths(repos, current.host !== undefined)],
+      })
+      io.out(`${bold(project.name)}  ${dim(project.id)}`)
+      for (const r of project.repos) io.out(`  ${r.name}  ${dim(r.path)}`)
+      io.out(dim('running agents see the new repos after `am project restart`'))
+      return 0
+    }
+    case 'restart': {
+      const current = await findProject(api, need(args[0], 'project'))
+      const { restarted, skipped } = await api.restartAgents(current.id)
+      io.out(`restarted ${restarted.length} agent${restarted.length === 1 ? '' : 's'}`)
+      for (const s of skipped) io.out(`  skipped ${s.id}: ${s.why}`)
+      return 0
+    }
+    default:
+      throw new UsageError(
+        sub ? `unknown project command "${sub}"` : 'project needs new, add-repo or restart',
+      )
+  }
 }
 
 async function login(rest: string[], io: Io): Promise<number> {
