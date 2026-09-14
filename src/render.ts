@@ -1,6 +1,6 @@
 import { marked } from 'marked'
 import { markedTerminal } from 'marked-terminal'
-import type { Item, StoredItem } from './types.js'
+import type { Item, StoredItem, Agent, AgentStatus } from './types.js'
 
 marked.use(markedTerminal({ reflowText: false, tab: 2 }) as never)
 
@@ -256,4 +256,17 @@ export function wrapText(
   wrap: (s: string, w: number) => string,
 ): string[] {
   return splitStyled(text).flatMap((l) => wrapLine(l, width, wrap))
+}
+
+/** Profile, model, effort, permission mode and working directory as one dotted line. */
+export function agentFacts(agent: Agent, status: AgentStatus): string {
+  return [
+    agent.profile,
+    status.model ?? agent.model ?? '',
+    agent.effort ? `effort ${agent.effort}` : '',
+    agent.permissions === 'ask' ? 'asks' : '',
+    agent.cwd,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }

@@ -66,8 +66,11 @@ permission or whose event stream is lost exits 0 after saying so.
 
 ## TUI
 
-`am` with no arguments. Three screens: projects, agents of a project,
-and the chat; `Esc` goes back, `q` quits from the pickers, `Ctrl+C`
+`am` with no arguments. Three screens: projects, agents of a project
+(each row with everything the agent was created with: profile, model,
+effort, "asks" in ask mode, working directory, since there is no
+editing; `am agents` prints the same), and the chat, whose first line
+repeats those facts; `Esc` goes back, `q` quits from the pickers, `Ctrl+C`
 always. Lists take arrows or `j`/`k`, `PageUp`/`PageDown`, `Enter`. The chat screen:
 
 - transcript: the last page from the manager, then live from the event

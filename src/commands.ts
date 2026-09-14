@@ -6,7 +6,7 @@ import { Api, ApiError } from './api.js'
 import { clearSession, loadSession, managerUrl, saveSession } from './config.js'
 import { client, findAgent, findProject } from './client.js'
 import { Events } from './events.js'
-import { bold, dim, renderItem, stateMark } from './render.js'
+import { agentFacts, bold, dim, renderItem, stateMark } from './render.js'
 import type { Agent, EventFrame, StoredItem, TurnImage } from './types.js'
 
 export interface Io {
@@ -111,7 +111,7 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const project = await findProject(api, need(rest[0], 'project'))
         for (const { agent, status } of await api.agents(project.id)) {
           const extra = [
-            status.model,
+            agentFacts(agent, status),
             status.background ? `${status.background} bg` : '',
             status.usage
               ? status.usage.windows.map((w) => `${w.name} ${w.usedPercent}%`).join(' ')

@@ -163,6 +163,7 @@ describe('App', () => {
     r.stdin.write('\r')
     await tick()
     expect(plain(r.lastFrame())).toContain('worker')
+    expect(plain(r.lastFrame())).toContain('fake · fake-1 · asks · /tmp/demo') // the agent's configuration, on its row
     r.stdin.write('\r')
     await tick(60)
     const frame = plain(r.lastFrame())

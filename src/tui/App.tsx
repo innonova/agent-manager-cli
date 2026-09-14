@@ -1,6 +1,6 @@
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import { useEffect, useState } from 'react'
-import { stateMark } from '../render.js'
+import { agentFacts, stateMark } from '../render.js'
 import type { AgentRow, Project } from '../types.js'
 import { Chat } from './Chat.tsx'
 import { Features } from './Features.tsx'
@@ -110,7 +110,8 @@ export function App({ store, size }: { store: Store; size?: { columns: number; r
             height={height - 3}
             empty="no agents yet (Ctrl+N creates one)"
             render={({ agent, status }) =>
-              `${stateMark(status.state)} ${store.attention.has(agent.id) ? '!' : ' '} ${agent.name.padEnd(20)} ${status.state.padEnd(19)} ${status.model ?? ''}`
+              // the row is the agent's whole configuration: there is no editing, so this is where to check it
+              `${stateMark(status.state)} ${store.attention.has(agent.id) ? '!' : ' '} ${agent.name.padEnd(20)} ${status.state.padEnd(19)} ${agentFacts(agent, status)}`
             }
             onSelect={({ agent }) =>
               go({ name: 'chat', project: screen.project, agentId: agent.id })

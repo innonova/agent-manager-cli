@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from 'ink'
 import { useEffect, useRef, useState } from 'react'
-import { clock, stateMark } from '../render.js'
+import { agentFacts, clock, stateMark } from '../render.js'
 import type { Store } from './store.js'
 import { useStore } from './use-store.js'
 import { Composer } from './Composer.tsx'
@@ -209,10 +209,9 @@ export function Chat({ store, agentId, width, height, focus, onBack }: ChatProps
     <Box flexDirection="column" width={width} height={height}>
       <Box>
         <Text bold>{row?.agent.name ?? agentId}</Text>
-        <Text dimColor>
+        <Text dimColor wrap="truncate-end">
           {' '}
-          {row?.agent.profile}
-          {row?.agent.permissions === 'ask' ? ' · asks' : ''} {last}
+          {row ? agentFacts(row.agent, row.status) : ''} {last}
         </Text>
       </Box>
       <Text wrap="truncate-end">{headerBits.join('  ')}</Text>
