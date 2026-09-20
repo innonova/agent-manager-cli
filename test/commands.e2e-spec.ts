@@ -127,6 +127,10 @@ describe('plain commands', () => {
     )
     await new Promise((r) => setTimeout(r, 3500)) // the manager polls features every 3 s
     expect((await am(['runs', 'demo'])).text).toContain('no runs yet') // nothing went in-progress under an agent
+    expect((await am(['runs', 'review', 'nope', '--outcome', 'accepted'])).err[0]).toMatch(
+      /404|no run/,
+    )
+    expect((await am(['runs', 'review', 'nope'])).code).toBe(2) // --outcome is required
     const list = await am(['features', 'demo'])
     expect(list.text).toContain('thing')
     const one = await am(['feature', 'demo', 'thing'])

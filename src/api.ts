@@ -145,6 +145,9 @@ export class Api {
   /** Forgets the agent for good: process, daemon logs, cache and rows. */
   remove = (id: string) => this.call<{ ok: true }>('DELETE', `/api/agents/${id}`)
   profiles = () => this.call<{ profiles: Profile[] }>('GET', '/api/profiles')
+  /** The reviewer's verdict on a run; a cause is required when sending back. */
+  reviewRun = (id: string, review: { outcome: string; cause?: string; note?: string }) =>
+    this.call<{ run: Run }>('PUT', `/api/runs/${encodeURIComponent(id)}/review`, review)
   /** The run log, newest first; a project id narrows it. */
   runs = (projectId?: string, limit = 50) =>
     this.call<{ runs: Run[] }>(

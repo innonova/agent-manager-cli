@@ -55,7 +55,11 @@ refuses it while the agent is busy), `archive <agent>`, `delete
 <agent>` (forget it for good: process, daemon logs, cache and rows;
 the vendor's store stays), `agents <project> --archived` (the archived
 ones), `runs [project]` (the manager's run log, newest first: feature,
-agent and model, duration, commit range, cost, outcome), `features
+agent and model, duration, commit range, cost, outcome, and the
+review once given), `runs review <run-id> --outcome accepted|sent-back
+[--cause model|brief|doc] [--note TEXT]` (the reviewer's verdict on a
+run, the delegating agent's usual last word on a helper's work; a
+cause is required when sending back), `features
 <project>`, `feature <project> <slug>`,
 `respond <project> <slug> <text> [--status]`; `am help` (or `-h`) prints
 the usage, `am tui` is the same as `am` alone.

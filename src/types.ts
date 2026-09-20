@@ -30,6 +30,14 @@ export interface Run {
   inputTokens: number | null
   outputTokens: number | null
   costUsd: number | null
+  /** The reviewer's verdict, once given: accepted, or sent back with a cause (the model, the brief, or a missing doc fact). */
+  review: {
+    outcome: 'accepted' | 'sent-back'
+    cause: 'model' | 'brief' | 'doc' | null
+    note: string | null
+    by: string
+    at: number
+  } | null
 }
 
 export interface Project {

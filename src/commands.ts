@@ -42,6 +42,8 @@ export const USAGE = `am — terminal client for agent-manager
   am archive <agent>          end its session and take it off the list (transcript kept)
   am delete <agent>           forget it for good: process, daemon logs, cache; the vendor's store stays
   am runs [project]           the run log: feature, agent and model, duration, commits, cost, outcome
+  am runs review <run-id> --outcome accepted|sent-back [--cause model|brief|doc] [--note TEXT]
+                              close the loop on a run: a cause is required when sending back
   am features <project>
   am feature <project> <slug>
   am respond <project> <slug> <text...> [--status planned|review|blocked|done]
@@ -212,6 +214,26 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       }
       case 'runs': {
         const api = client()
+        if (rest[0] === 'review') {
+          const { values, positionals } = parseArgs({
+            args: rest.slice(1),
+            allowPositionals: true,
+            options: {
+              outcome: { type: 'string' },
+              cause: { type: 'string' },
+              note: { type: 'string' },
+            },
+          })
+          const { run } = await api.reviewRun(need(positionals[0], 'run id'), {
+            outcome: need(values.outcome, '--outcome'),
+            ...(values.cause ? { cause: values.cause } : {}),
+            ...(values.note ? { note: values.note } : {}),
+          })
+          io.out(
+            `${run.slug}: ${run.reviewOutcome}${run.reviewCause ? ` (${run.reviewCause})` : ''}`,
+          )
+          return 0
+        }
         const project = rest[0] ? await findProject(api, rest[0]) : null
         const { runs } = await api.runs(project?.id)
         if (runs.length === 0) {
@@ -227,8 +249,11 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
                 : `${r.baseCommit.slice(0, 7)}..${r.endCommit.slice(0, 7)}`
               : ''
           const cost = r.costUsd != null ? `$${r.costUsd.toFixed(2)}` : ''
+          const review = r.reviewOutcome
+            ? `  ${r.reviewOutcome}${r.reviewCause ? ` (${r.reviewCause})` : ''}`
+            : ''
           io.out(
-            `${bold(r.slug)}  ${dim(project ? '' : r.projectName + '  ')}${r.agentName} · ${r.model ?? r.profile}  ${mins}  ${commits}  ${cost}  ${r.outcome ?? ''}${r.featureStatus ? ` → ${r.featureStatus}` : ''}  ${dim(r.id)}`,
+            `${bold(r.slug)}  ${dim(project ? '' : r.projectName + '  ')}${r.agentName} · ${r.model ?? r.profile}  ${mins}  ${commits}  ${cost}  ${r.outcome ?? ''}${r.featureStatus ? ` → ${r.featureStatus}` : ''}${review}  ${dim(r.id)}`,
           )
         }
         return 0
