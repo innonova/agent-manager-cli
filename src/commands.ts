@@ -230,7 +230,7 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
             ...(values.note ? { note: values.note } : {}),
           })
           io.out(
-            `${run.slug}: ${run.reviewOutcome}${run.reviewCause ? ` (${run.reviewCause})` : ''}`,
+            `${run.slug}: ${run.review?.outcome ?? '?'}${run.review?.cause ? ` (${run.review.cause})` : ''}`,
           )
           return 0
         }
@@ -249,8 +249,8 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
                 : `${r.baseCommit.slice(0, 7)}..${r.endCommit.slice(0, 7)}`
               : ''
           const cost = r.costUsd != null ? `$${r.costUsd.toFixed(2)}` : ''
-          const review = r.reviewOutcome
-            ? `  ${r.reviewOutcome}${r.reviewCause ? ` (${r.reviewCause})` : ''}`
+          const review = r.review
+            ? `  ${r.review.outcome}${r.review.cause ? ` (${r.review.cause})` : ''}`
             : ''
           io.out(
             `${bold(r.slug)}  ${dim(project ? '' : r.projectName + '  ')}${r.agentName} · ${r.model ?? r.profile}  ${mins}  ${commits}  ${cost}  ${r.outcome ?? ''}${r.featureStatus ? ` → ${r.featureStatus}` : ''}${review}  ${dim(r.id)}`,
