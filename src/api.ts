@@ -5,6 +5,7 @@ import type {
   Feature,
   Profile,
   Project,
+  Run,
   StoredItem,
   TurnImage,
   User,
@@ -144,6 +145,12 @@ export class Api {
   /** Forgets the agent for good: process, daemon logs, cache and rows. */
   remove = (id: string) => this.call<{ ok: true }>('DELETE', `/api/agents/${id}`)
   profiles = () => this.call<{ profiles: Profile[] }>('GET', '/api/profiles')
+  /** The run log, newest first; a project id narrows it. */
+  runs = (projectId?: string, limit = 50) =>
+    this.call<{ runs: Run[] }>(
+      'GET',
+      `/api/runs?limit=${limit}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`,
+    )
 
   features = (projectId: string) =>
     this.call<{ features: Feature[] }>('GET', `/api/projects/${projectId}/features`)

@@ -41,6 +41,7 @@ export const USAGE = `am — terminal client for agent-manager
   am restart <agent>          stop and resume with the current settings; refused while busy
   am archive <agent>          end its session and take it off the list (transcript kept)
   am delete <agent>           forget it for good: process, daemon logs, cache; the vendor's store stays
+  am runs [project]           the run log: feature, agent and model, duration, commits, cost, outcome
   am features <project>
   am feature <project> <slug>
   am respond <project> <slug> <text...> [--status planned|review|blocked|done]
@@ -207,6 +208,29 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
         await api.remove(agent.id)
         io.out('deleted')
+        return 0
+      }
+      case 'runs': {
+        const api = client()
+        const project = rest[0] ? await findProject(api, rest[0]) : null
+        const { runs } = await api.runs(project?.id)
+        if (runs.length === 0) {
+          io.out(dim('no runs yet'))
+          return 0
+        }
+        for (const r of runs) {
+          const mins = r.endedAt ? `${Math.round((r.endedAt - r.startedAt) / 60000)} min` : 'open'
+          const commits =
+            r.baseCommit && r.endCommit
+              ? r.baseCommit === r.endCommit
+                ? `${r.baseCommit.slice(0, 7)} (no commit)`
+                : `${r.baseCommit.slice(0, 7)}..${r.endCommit.slice(0, 7)}`
+              : ''
+          const cost = r.costUsd != null ? `$${r.costUsd.toFixed(2)}` : ''
+          io.out(
+            `${bold(r.slug)}  ${dim(project ? '' : r.projectName + '  ')}${r.agentName} · ${r.model ?? r.profile}  ${mins}  ${commits}  ${cost}  ${r.outcome ?? ''}${r.featureStatus ? ` → ${r.featureStatus}` : ''}  ${dim(r.id)}`,
+          )
+        }
         return 0
       }
       case 'features': {

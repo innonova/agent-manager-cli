@@ -126,6 +126,7 @@ describe('plain commands', () => {
       '---\ntitle: a thing\nstatus: planned\npriority: 10\n---\n\nDo the thing.\n',
     )
     await new Promise((r) => setTimeout(r, 3500)) // the manager polls features every 3 s
+    expect((await am(['runs', 'demo'])).text).toContain('no runs yet') // nothing went in-progress under an agent
     const list = await am(['features', 'demo'])
     expect(list.text).toContain('thing')
     const one = await am(['feature', 'demo', 'thing'])

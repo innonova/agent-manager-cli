@@ -7,6 +7,31 @@ export interface Repo {
   name: string
   path: string
 }
+/** One agent's work on one feature, as the manager's run log keeps it (see the manager's Runs section). */
+export interface Run {
+  id: string
+  projectId: string
+  projectName: string
+  host: string
+  repo: string
+  slug: string
+  agentId: string
+  agentName: string
+  profile: string
+  model: string | null
+  effort: string | null
+  startedAt: number
+  endedAt: number | null
+  featureStatus: string | null
+  outcome: string | null
+  baseCommit: string | null
+  endCommit: string | null
+  turns: number | null
+  inputTokens: number | null
+  outputTokens: number | null
+  costUsd: number | null
+}
+
 export interface Project {
   id: string
   name: string

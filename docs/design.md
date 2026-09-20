@@ -54,7 +54,9 @@ agent with the current settings, conversation intact; the manager
 refuses it while the agent is busy), `archive <agent>`, `delete
 <agent>` (forget it for good: process, daemon logs, cache and rows;
 the vendor's store stays), `agents <project> --archived` (the archived
-ones), `features <project>`, `feature <project> <slug>`,
+ones), `runs [project]` (the manager's run log, newest first: feature,
+agent and model, duration, commit range, cost, outcome), `features
+<project>`, `feature <project> <slug>`,
 `respond <project> <slug> <text> [--status]`; `am help` (or `-h`) prints
 the usage, `am tui` is the same as `am` alone.
 
