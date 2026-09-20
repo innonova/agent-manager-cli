@@ -546,12 +546,16 @@ async function follow(
       if (s.item.text === lastText) return
       lastText = s.item.text
     }
-    // quiet: the run is not printed, only what it came to (the final answer) and how it ended
+    // quiet: the run's tool calls and thinking are not printed, only what
+    // the agent said (every completed text, since an answer that ran a
+    // command between two paragraphs is still one answer) and how it ended
     if (!quiet) io.out(line)
-    else if (s.item.kind === 'turn_end') {
-      if (lastText) io.out(lastText)
-      io.out(line)
-    } else if (s.item.kind === 'error' || (s.item.kind === 'permission' && !s.item.decision))
+    else if (s.item.kind === 'text') io.out(s.item.text)
+    else if (
+      s.item.kind === 'turn_end' ||
+      s.item.kind === 'error' ||
+      (s.item.kind === 'permission' && !s.item.decision)
+    )
       io.out(line)
     if (s.item.kind === 'turn_end') settle('ended')
     else if (s.item.kind === 'error') settle('error')
@@ -660,16 +664,16 @@ async function wait(rest: string[], io: Io): Promise<number> {
     status.state === 'starting'
   )
     return (await follow(api, agent, from, io, true)) === 'error' ? 1 : 0
-  let lastText = ''
+  const texts: string[] = []
   let end: StoredItem | null = null
   for (const s of items) {
     if (s.index < from) continue
-    if (s.item.kind === 'text' && !s.item.streaming) lastText = s.item.text
+    if (s.item.kind === 'text' && !s.item.streaming) texts.push(s.item.text)
     if (s.item.kind === 'turn_end' || s.item.kind === 'error') end = s
   }
-  if (lastText) io.out(lastText)
+  for (const t of texts) io.out(t)
   if (end) io.out(renderItem(end))
-  else if (!lastText) io.out(dim('nothing to wait for and no answer yet'))
+  else if (texts.length === 0) io.out(dim('nothing to wait for and no answer yet'))
   return end?.item.kind === 'error' ? 1 : 0
 }
 

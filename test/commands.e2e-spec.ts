@@ -74,7 +74,7 @@ describe('plain commands', () => {
     // quiet: the answer and the turn-end line, nothing of the run itself
     const quiet = await am(['turn', 'demo/worker', 'again', '--quiet'])
     expect(quiet.code).toBe(0)
-    expect(quiet.out).toHaveLength(2)
+    expect(quiet.out).toHaveLength(2) // one text, then the turn end: nothing of the run itself
     expect(quiet.out[0]).toMatch(/^You said: again/)
     expect(quiet.out[1]).toContain('turn end')
     // wait with nothing under way: the last answer, from the transcript
@@ -88,6 +88,12 @@ describe('plain commands', () => {
     expect(collected.code).toBe(0)
     expect(collected.out[0]).toContain('deliberately slow')
     expect(collected.out[1]).toContain('turn end')
+    // a turn with thinking and a tool call in it: the text and the end, the call and the thinking kept out
+    const tooled = await am(['turn', 'demo/worker', 'tool', '--quiet'])
+    expect(tooled.code).toBe(0)
+    expect(tooled.out).toHaveLength(2)
+    expect(tooled.text).not.toContain('Read')
+    expect(tooled.text).not.toContain('look at the file')
     const tailed = await am(['tail', 'worker', '--lines', '3'])
     expect(tailed.code).toBe(0)
     expect(tailed.out.length).toBe(3)

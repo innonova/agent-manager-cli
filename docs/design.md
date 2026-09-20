@@ -74,10 +74,12 @@ the usage, `am tui` is the same as `am` alone.
 
 `turn`, `allow` and `deny` print the turn as it runs and return when it
 ends, errors, or stops to ask a permission (`--no-wait` just sends;
-`turn --quiet` prints only the final answer, the turn-end line with
-its duration and cost, and an error or a permission request if the
-turn stopped there: a return value for an agent that delegated the
-turn). `wait <agent>` waits out the turn under way and prints the
+`turn --quiet` prints what the agent said, every completed text of
+the turn and not only the last, since an answer that ran a command
+between two paragraphs is still one answer (a debrief was lost that
+way, learnings #42), the turn-end line with its duration and cost, and
+an error or a permission request if the turn stopped there: a return
+value for an agent that delegated the turn). `wait <agent>` waits out the turn under way and prints the
 same, or the last turn's answer straight from the transcript when
 none is under way; with `turn --no-wait` it lets a caller send, do
 something else and collect later.
