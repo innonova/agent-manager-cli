@@ -35,6 +35,7 @@ export const USAGE = `am — terminal client for agent-manager
   am deny <agent>             both print the rest of the turn unless --no-wait
   am interrupt <agent>
   am stop <agent>
+  am restart <agent>          stop and resume with the current settings; refused while busy
   am features <project>
   am feature <project> <slug>
   am respond <project> <slug> <text...> [--status planned|review|blocked|done]
@@ -171,6 +172,13 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
         await api.stop(agent.id)
         io.out('stopped')
+        return 0
+      }
+      case 'restart': {
+        const api = client()
+        const { agent } = await findAgent(api, need(rest[0], 'agent'))
+        await api.restart(agent.id)
+        io.out('restarted')
         return 0
       }
       case 'features': {

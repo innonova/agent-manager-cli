@@ -95,6 +95,9 @@ describe('plain commands', () => {
   })
 
   it('stops an agent and lists features', async () => {
+    const restarted = await am(['restart', 'worker'])
+    expect(restarted.code).toBe(0)
+    expect(restarted.text).toContain('restarted')
     const stopped = await am(['stop', 'worker'])
     expect(stopped.code).toBe(0)
     fs.mkdirSync(path.join(backend.projectDir, 'features'), { recursive: true })

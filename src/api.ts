@@ -123,6 +123,8 @@ export class Api {
     this.call<{ ok: true }>('POST', `/api/agents/${id}/permission`, { requestId, option })
   interrupt = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/interrupt`, {})
   stop = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/stop`, {})
+  /** Stops and resumes one agent with the current settings; the manager refuses (409) while it is busy. */
+  restart = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/restart`, {})
   archive = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/archive`, {})
   profiles = () => this.call<{ profiles: Profile[] }>('GET', '/api/profiles')
 

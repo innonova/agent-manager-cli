@@ -46,7 +46,9 @@ listed as skipped), `agents <project>`,
 `tail <agent> [--lines N] [--follow] [--full]` (`--follow` streams,
 `--full` expands tool output and thinking), `turn <agent> <text>
 [--steer] [--no-wait]`, `allow <agent> [--option ID]` / `deny <agent>`,
-`interrupt`, `stop`, `features <project>`, `feature <project> <slug>`,
+`interrupt`, `stop`, `restart <agent>` (stop and resume that one
+agent with the current settings, conversation intact; the manager
+refuses it while the agent is busy), `features <project>`, `feature <project> <slug>`,
 `respond <project> <slug> <text> [--status]`; `am help` (or `-h`) prints
 the usage, `am tui` is the same as `am` alone.
 
