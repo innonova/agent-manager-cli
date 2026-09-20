@@ -70,7 +70,11 @@ Units of work live in `features/<slug>.md` (frontmatter: title, status,
 priority, dependsOn; body is the spec, followed by the conversation).
 Nothing queues them: a human asks in the conversation. Set
 `status: in-progress` when you start, append `## Report (YYYY-MM-DD)`
-and set `status: review` when done (`blocked` with the reason if you
+(what changed, what was verified, what is left open, and what was
+noticed and left alone: anything seen outside the feature's scope) and
+set `status: review` when done (`blocked` with the reason if you
 cannot continue), commit the file with the work, never edit the other
 frontmatter fields, and do not create or edit feature files otherwise
-unless asked. The convention is in `../agent-manager/docs/design.md`.
+unless asked. The convention is in `../agent-manager/docs/design.md`;
+the practice around it, including how agents delegate to helpers, is
+`../agent-manager/docs/method.md`.
