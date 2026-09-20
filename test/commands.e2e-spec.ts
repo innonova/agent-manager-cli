@@ -127,7 +127,10 @@ describe('plain commands', () => {
     )
     await new Promise((r) => setTimeout(r, 3500)) // the manager polls features every 3 s
     expect((await am(['runs', 'demo'])).text).toContain('no runs yet') // nothing went in-progress under an agent
-    expect((await am(['method'])).text).toContain('Working with agents')
+    // the shipped texts, which the backend now falls back to: its own
+    // config files are in its temp root, not the developer's
+    expect((await am(['method'])).text).toContain('Bringing an agent in')
+    expect((await am(['framing'])).text).toContain('Writing a feature')
     expect((await am(['learnings'])).text).toContain('nothing recorded yet')
     expect((await am(['learn', 'The fake agent', 'has no taste.', '--ref', 'demo'])).text).toMatch(
       /recorded as #1/,

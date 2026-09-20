@@ -152,6 +152,12 @@ export class Api {
   /** The method: how work is run under this manager, the text in force on this machine. */
   method = () =>
     this.call<{ hosts: { host: string; template: string; source: string }[] }>('GET', '/api/method')
+  /** The framing: how a feature and a brief are written, the method's companion. */
+  framing = () =>
+    this.call<{ hosts: { host: string; template: string; source: string }[] }>(
+      'GET',
+      '/api/framing',
+    )
   /** The install's learnings log, entries after `since`, oldest first. */
   learnings = (since = 0) =>
     this.call<{ entries: Learning[] }>('GET', `/api/learnings?since=${since}`)

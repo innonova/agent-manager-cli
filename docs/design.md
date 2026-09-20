@@ -56,6 +56,9 @@ refuses it while the agent is busy), `archive <agent>`, `delete
 the vendor's store stays), `agents <project> --archived` (the archived
 ones), `method` (prints how work is run under this manager: features, the
 gate, helpers, reviews, the text the manager serves at `/api/method`),
+`framing` (its companion, how a feature and a brief are written, from
+`/api/framing`; the two are read at different moments and are two
+files for that reason),
 `learn <text> [--ref R]` (appends an entry to the install's learnings
 log, stamped with the time and this session's agent; an observation
 with a pointer, never edited), `learnings [--since N]` (the log,

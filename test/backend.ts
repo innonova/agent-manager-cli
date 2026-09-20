@@ -80,6 +80,8 @@ export async function startBackend(): Promise<Backend> {
       AGENT_MANAGER_EVENTS_PING_MS: '500',
       AGENT_MANAGER_HARNESS_FILE: path.join(root, 'harness.md'), // never the developer's own ~/.config files
       AGENT_MANAGER_MODELS_FILE: path.join(root, 'models.md'),
+      AGENT_MANAGER_METHOD_FILE: path.join(root, 'method.md'),
+      AGENT_MANAGER_FRAMING_FILE: path.join(root, 'framing.md'),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

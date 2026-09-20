@@ -42,6 +42,7 @@ export const USAGE = `am — terminal client for agent-manager
   am archive <agent>          end its session and take it off the list (transcript kept)
   am delete <agent>           forget it for good: process, daemon logs, cache; the vendor's store stays
   am method                   how work is run under this manager: features, the gate, helpers, reviews
+  am framing                  its companion: how a feature and a brief are written
   am learn <text...> [--ref R]   record something learned about working here, at the moment of noticing
   am learnings [--since N]    the learnings log, oldest first (entries after N)
   am runs [project]           the run log: feature, agent and model, duration, commits, cost, outcome
@@ -215,11 +216,15 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         io.out('deleted')
         return 0
       }
-      case 'method': {
+      case 'method':
+      case 'framing': {
+        // the two documents of the practice, printed as they stand on this
+        // machine: the method is the steps, the framing is what is said at
+        // each of them
         const api = client()
-        const { hosts } = await api.method()
+        const { hosts } = cmd === 'method' ? await api.method() : await api.framing()
         const local = hosts[0]
-        if (!local) throw new Error('the manager has no method text')
+        if (!local) throw new Error(`the manager has no ${cmd} text`)
         io.out(local.template)
         return 0
       }
