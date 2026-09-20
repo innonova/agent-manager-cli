@@ -127,6 +127,15 @@ describe('plain commands', () => {
     )
     await new Promise((r) => setTimeout(r, 3500)) // the manager polls features every 3 s
     expect((await am(['runs', 'demo'])).text).toContain('no runs yet') // nothing went in-progress under an agent
+    expect((await am(['method'])).text).toContain('Working with agents')
+    expect((await am(['learnings'])).text).toContain('nothing recorded yet')
+    expect((await am(['learn', 'The fake agent', 'has no taste.', '--ref', 'demo'])).text).toMatch(
+      /recorded as #1/,
+    )
+    const learned = await am(['learnings'])
+    expect(learned.text).toContain('#1')
+    expect(learned.text).toContain('The fake agent has no taste.')
+    expect(learned.text).toContain('demo')
     expect((await am(['runs', 'review', 'nope', '--outcome', 'accepted'])).err[0]).toMatch(
       /404|no run/,
     )

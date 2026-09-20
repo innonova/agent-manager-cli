@@ -40,6 +40,15 @@ export interface Run {
   } | null
 }
 
+/** One entry of the install's learnings log: an observation with evidence, appended and never edited. */
+export interface Learning {
+  n: number
+  at: number
+  by: string
+  ref: string | null
+  text: string
+}
+
 export interface Project {
   id: string
   name: string

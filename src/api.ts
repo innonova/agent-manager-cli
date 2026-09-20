@@ -3,6 +3,7 @@ import type {
   AgentRow,
   AgentStatus,
   Feature,
+  Learning,
   Profile,
   Project,
   Run,
@@ -148,6 +149,15 @@ export class Api {
   /** The reviewer's verdict on a run; a cause is required when sending back. */
   reviewRun = (id: string, review: { outcome: string; cause?: string; note?: string }) =>
     this.call<{ run: Run }>('PUT', `/api/runs/${encodeURIComponent(id)}/review`, review)
+  /** The method: how work is run under this manager, the text in force on this machine. */
+  method = () =>
+    this.call<{ hosts: { host: string; template: string; source: string }[] }>('GET', '/api/method')
+  /** The install's learnings log, entries after `since`, oldest first. */
+  learnings = (since = 0) =>
+    this.call<{ entries: Learning[] }>('GET', `/api/learnings?since=${since}`)
+  /** Appends an entry; the manager stamps time and author (this session's agent, under its token). */
+  learn = (text: string, ref?: string) =>
+    this.call<{ entry: Learning }>('POST', '/api/learnings', { text, ...(ref ? { ref } : {}) })
   /** The run log, newest first; a project id narrows it. */
   runs = (projectId?: string, limit = 50) =>
     this.call<{ runs: Run[] }>(

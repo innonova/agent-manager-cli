@@ -41,6 +41,9 @@ export const USAGE = `am — terminal client for agent-manager
   am restart <agent>          stop and resume with the current settings; refused while busy
   am archive <agent>          end its session and take it off the list (transcript kept)
   am delete <agent>           forget it for good: process, daemon logs, cache; the vendor's store stays
+  am method                   how work is run under this manager: features, the gate, helpers, reviews
+  am learn <text...> [--ref R]   record something learned about working here, at the moment of noticing
+  am learnings [--since N]    the learnings log, oldest first (entries after N)
   am runs [project]           the run log: feature, agent and model, duration, commits, cost, outcome
   am runs review <run-id> --outcome accepted|sent-back [--cause model|brief|doc] [--note TEXT]
                               close the loop on a run: a cause is required when sending back
@@ -210,6 +213,44 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
         await api.remove(agent.id)
         io.out('deleted')
+        return 0
+      }
+      case 'method': {
+        const api = client()
+        const { hosts } = await api.method()
+        const local = hosts[0]
+        if (!local) throw new Error('the manager has no method text')
+        io.out(local.template)
+        return 0
+      }
+      case 'learn': {
+        const { values, positionals } = parseArgs({
+          args: rest,
+          allowPositionals: true,
+          options: { ref: { type: 'string' } },
+        })
+        const text = positionals.join(' ')
+        if (!text) throw new UsageError('a text is required')
+        const api = client()
+        const { entry } = await api.learn(text, values.ref)
+        io.out(`recorded as #${entry.n}`)
+        return 0
+      }
+      case 'learnings': {
+        const { values } = parseArgs({ args: rest, options: { since: { type: 'string' } } })
+        const api = client()
+        const { entries } = await api.learnings(Number(values.since ?? 0))
+        if (entries.length === 0) {
+          io.out(dim('nothing recorded yet'))
+          return 0
+        }
+        for (const e of entries) {
+          io.out(
+            `${bold(`#${e.n}`)}  ${dim(new Date(e.at).toISOString().slice(0, 16).replace('T', ' '))}  ${e.by}${e.ref ? dim(`  ${e.ref}`) : ''}`,
+          )
+          io.out(e.text)
+          io.out('')
+        }
         return 0
       }
       case 'runs': {

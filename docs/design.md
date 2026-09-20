@@ -54,7 +54,12 @@ agent with the current settings, conversation intact; the manager
 refuses it while the agent is busy), `archive <agent>`, `delete
 <agent>` (forget it for good: process, daemon logs, cache and rows;
 the vendor's store stays), `agents <project> --archived` (the archived
-ones), `runs [project]` (the manager's run log, newest first: feature,
+ones), `method` (prints how work is run under this manager: features, the
+gate, helpers, reviews, the text the manager serves at `/api/method`),
+`learn <text> [--ref R]` (appends an entry to the install's learnings
+log, stamped with the time and this session's agent; an observation
+with a pointer, never edited), `learnings [--since N]` (the log,
+oldest first), `runs [project]` (the manager's run log, newest first: feature,
 agent and model, duration, commit range, cost, outcome, and the
 review once given), `runs review <run-id> --outcome accepted|sent-back
 [--cause model|brief|doc] [--note TEXT]` (the reviewer's verdict on a
