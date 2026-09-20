@@ -16,6 +16,7 @@ const project: Project = {
   path: '/tmp/demo',
   repos: [{ name: 'demo', path: '/tmp/demo' }],
   defaultProfile: 'fake',
+  delegation: 'free',
   createdAt: 0,
 }
 const worker: AgentRow = {

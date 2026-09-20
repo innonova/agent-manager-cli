@@ -22,8 +22,9 @@ export const USAGE = `am — terminal client for agent-manager
   am login [--name NAME] [--url URL]   (AGENT_MANAGER_PASSWORD in the environment skips the prompt)
   am logout
   am projects
-  am project new <name> <repo-path>... [--profile P] [--host H]   (paths as on the manager's machine)
+  am project new <name> <repo-path>... [--profile P] [--delegation free|on-request] [--host H]   (paths as on the manager's machine)
   am project add-repo <project> <repo-path>...
+  am project set <project> --delegation free|on-request   when agents may start other agents
   am project restart <project>   restart the idle agents so they see the new repos
   am agents <project> [--archived]
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
@@ -375,6 +376,11 @@ function repoPaths(raw: string[], remote: boolean): { path: string }[] {
   })
 }
 
+function parseDelegation(v: string): 'free' | 'on-request' {
+  if (v === 'free' || v === 'on-request') return v
+  throw new UsageError('--delegation must be "free" or "on-request"')
+}
+
 async function project(rest: string[], io: Io): Promise<number> {
   const [sub, ...args] = rest
   const api = client()
@@ -383,17 +389,37 @@ async function project(rest: string[], io: Io): Promise<number> {
       const { values, positionals } = parseArgs({
         args,
         allowPositionals: true,
-        options: { profile: { type: 'string' }, host: { type: 'string' } },
+        options: {
+          profile: { type: 'string' },
+          host: { type: 'string' },
+          delegation: { type: 'string' },
+        },
       })
       const [name, ...repos] = positionals
       const { project } = await api.createProject({
         name: need(name, 'name'),
         repos: repoPaths(repos, values.host !== undefined),
         ...(values.profile ? { defaultProfile: values.profile } : {}),
+        ...(values.delegation ? { delegation: parseDelegation(values.delegation) } : {}),
         ...(values.host ? { host: values.host } : {}),
       })
       io.out(`${bold(project.name)}  ${dim(project.id)}`)
       for (const r of project.repos) io.out(`  ${r.name}  ${dim(r.path)}`)
+      return 0
+    }
+    case 'set': {
+      const { values, positionals } = parseArgs({
+        args,
+        allowPositionals: true,
+        options: { delegation: { type: 'string' } },
+      })
+      const current = await findProject(api, need(positionals[0], 'project'))
+      if (values.delegation === undefined) throw new UsageError('nothing to set (--delegation)')
+      const { project } = await api.updateProject(current.id, {
+        delegation: parseDelegation(values.delegation),
+      })
+      io.out(`${bold(project.name)}  delegation ${project.delegation}  ${dim(project.id)}`)
+      io.out(dim('running agents see it after `am project restart`'))
       return 0
     }
     case 'add-repo': {
@@ -417,7 +443,9 @@ async function project(rest: string[], io: Io): Promise<number> {
     }
     default:
       throw new UsageError(
-        sub ? `unknown project command "${sub}"` : 'project needs new, add-repo or restart',
+        sub
+          ? `unknown project command "${sub}"`
+          : 'project needs new, add-repo, set or restart',
       )
   }
 }

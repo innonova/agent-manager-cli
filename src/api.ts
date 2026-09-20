@@ -81,6 +81,7 @@ export class Api {
     name: string
     repos: { name?: string; path: string }[]
     defaultProfile?: string
+    delegation?: 'free' | 'on-request'
     host?: string
   }) => this.call<{ project: Project }>('POST', '/api/projects', input)
   updateProject = (
@@ -89,6 +90,7 @@ export class Api {
       name?: string
       repos?: { name?: string; path: string }[]
       defaultProfile?: string | null
+      delegation?: 'free' | 'on-request'
     },
   ) => this.call<{ project: Project }>('PATCH', `/api/projects/${id}`, input)
   /** Stops and resumes the project's idle agents so they see changed settings; busy ones are skipped. */

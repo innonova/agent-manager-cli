@@ -221,4 +221,23 @@ describe('plain commands', () => {
     expect(bad.err[0]).toMatch(/not a directory/)
     expect((await am(['project'])).code).toBe(2)
   })
+
+  it('sets a project’s delegation at creation and with set, and refuses a bad value', async () => {
+    process.env.AGENT_MANAGER_PASSWORD = ADMIN_PASSWORD
+    expect((await am(['login', '--name', 'admin', '--url', backend.url])).code).toBe(0)
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'am-cli-deleg-'))
+    fs.mkdirSync(path.join(base, 'r'))
+    const made = await am(['project', 'new', 'guarded', path.join(base, 'r'), '--delegation', 'on-request'])
+    expect(made.code).toBe(0)
+    // set it back to free
+    const set = await am(['project', 'set', 'guarded', '--delegation', 'free'])
+    expect(set.code).toBe(0)
+    expect(set.text).toContain('delegation free')
+    // a bad value is a usage error (exit 2)
+    const bad = await am(['project', 'set', 'guarded', '--delegation', 'sometimes'])
+    expect(bad.code).toBe(2)
+    expect(bad.err.join('\n')).toMatch(/free.*on-request/)
+    // set with nothing to change is a usage error too
+    expect((await am(['project', 'set', 'guarded'])).code).toBe(2)
+  })
 })
