@@ -7,7 +7,8 @@ import { clearSession, loadSession, managerUrl, saveSession } from './config.js'
 import { client, findAgent, findProject } from './client.js'
 import { Events } from './events.js'
 import { agentFacts, bold, dim, renderItem, stateMark } from './render.js'
-import type { Agent, EventFrame, StoredItem, TurnImage } from './types.js'
+import { answerTexts } from './quiet.js'
+import type { Agent, EventFrame, Item, StoredItem, TurnImage } from './types.js'
 
 export interface Io {
   out: (line: string) => void
@@ -30,7 +31,8 @@ export const USAGE = `am — terminal client for agent-manager
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
   am tail <agent> [--lines N] [--follow] [--full]
   am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send;
-                              --quiet: print only the final answer and the turn's cost;
+                              --quiet: print the agent's answer (its texts, minus the
+                              narration before a tool call) and the turn's cost;
                               --steer: while a turn runs, deliver it into the turn or queue it;
                               --image FILE: send an image along, repeatable; png/jpeg/gif/webp)
   am wait <agent>             wait for the turn under way to end, then print its final answer
@@ -562,6 +564,12 @@ async function follow(
   const events = new Events(api.url, api.authHeaders())
   const printed = new Map<number, string>()
   let lastText = ''
+  // quiet: the completed items of the turn in order, and how many of the
+  // answer's texts have been printed. answerTexts() decides each text once
+  // the item after it has arrived (a short text before a tool call is
+  // narration and dropped), so a text is emitted the moment it is settled.
+  const quietItems: Item[] = []
+  let printedTexts = 0
   let outcome: 'ended' | 'error' | 'permission' | 'lost' | null = null
   const settle = (o: typeof outcome) => (outcome ??= o)
   const consider = (s: StoredItem): void => {
@@ -575,16 +583,21 @@ async function follow(
       lastText = s.item.text
     }
     // quiet: the run's tool calls and thinking are not printed, only what
-    // the agent said (every completed text, since an answer that ran a
-    // command between two paragraphs is still one answer) and how it ended
+    // the agent said to the person (its answer, several texts with tool
+    // calls between them, minus the narration before a tool call) and how
+    // it ended
     if (!quiet) io.out(line)
-    else if (s.item.kind === 'text') io.out(s.item.text)
-    else if (
-      s.item.kind === 'turn_end' ||
-      s.item.kind === 'error' ||
-      (s.item.kind === 'permission' && !s.item.decision)
-    )
-      io.out(line)
+    else {
+      quietItems.push(s.item)
+      const texts = answerTexts(quietItems)
+      while (printedTexts < texts.length) io.out(texts[printedTexts++]!)
+      if (
+        s.item.kind === 'turn_end' ||
+        s.item.kind === 'error' ||
+        (s.item.kind === 'permission' && !s.item.decision)
+      )
+        io.out(line)
+    }
     if (s.item.kind === 'turn_end') settle('ended')
     else if (s.item.kind === 'error') settle('error')
     else if (s.item.kind === 'system' && s.item.text.startsWith('session ended')) settle('ended')
