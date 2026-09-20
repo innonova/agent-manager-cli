@@ -11,7 +11,7 @@ export async function tui(io: Io): Promise<number> {
     io.err('the TUI needs a terminal; see `am help` for the plain commands')
     return 2
   }
-  const events = new Events(api.url, api.cookie!)
+  const events = new Events(api.url, api.authHeaders())
   const store = new Store(api, events)
   process.stdout.write('\x1b[?1049h\x1b[H') // alternate screen: the shell's scrollback stays clean
   let app: ReturnType<typeof render> | null = null

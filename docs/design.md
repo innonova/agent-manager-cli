@@ -7,15 +7,15 @@ shell. Claude Code works over that path, so this does too.
 
 ## Decisions
 
-| Decision | Why |
-|---|---|
-| A client of the manager, never of the daemon | The manager owns the transcript cache and paging, attribution, permissions, presence and features. Going around it would duplicate all of that and drift. |
-| Same machine, localhost by default | The client exists for the case where nothing but a shell reaches the box; a tunnel would make the browser work instead. The URL is configurable for tests, not for remote use. |
-| Same accounts, same cookie | `POST /api/auth/login` with a user's password; the cookie is kept in `~/.config/agent-manager-cli/session.json`, mode 600. The manager accepts requests without an `Origin` header, so nothing in it changes for a non-browser client. |
-| Node, Ink, React | The tools already on the box. Ink is the maintained full-screen framework for Node and what the agent CLIs themselves use. React is a second paradigm next to the Vue UI; the components here are small enough for that not to matter. |
-| A decently sized terminal is required | Resizing a window is a small ask; degrading layouts are not worth their code. Under 80×24 the TUI says so and waits. |
-| Plain commands first, the TUI on top | Every capability exists as a command that works in any terminal and in scripts (`am tail --follow` in one pane, `am turn` in another is a usable client on its own). The TUI is a view over the same client code. |
-| Ported: projects, agents, chat, permissions, features | What is needed to give an agent work and read its answer. Not ported: files and diffs (the shell has an editor and git), users, display preferences. Drafts if missed. |
+| Decision                                              | Why                                                                                                                                                                                                                                    |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A client of the manager, never of the daemon          | The manager owns the transcript cache and paging, attribution, permissions, presence and features. Going around it would duplicate all of that and drift.                                                                              |
+| Same machine, localhost by default                    | The client exists for the case where nothing but a shell reaches the box; a tunnel would make the browser work instead. The URL is configurable for tests, not for remote use.                                                         |
+| Same accounts, same cookie                            | `POST /api/auth/login` with a user's password; the cookie is kept in `~/.config/agent-manager-cli/session.json`, mode 600. The manager accepts requests without an `Origin` header, so nothing in it changes for a non-browser client. |
+| Node, Ink, React                                      | The tools already on the box. Ink is the maintained full-screen framework for Node and what the agent CLIs themselves use. React is a second paradigm next to the Vue UI; the components here are small enough for that not to matter. |
+| A decently sized terminal is required                 | Resizing a window is a small ask; degrading layouts are not worth their code. Under 80×24 the TUI says so and waits.                                                                                                                   |
+| Plain commands first, the TUI on top                  | Every capability exists as a command that works in any terminal and in scripts (`am tail --follow` in one pane, `am turn` in another is a usable client on its own). The TUI is a view over the same client code.                      |
+| Ported: projects, agents, chat, permissions, features | What is needed to give an agent work and read its answer. Not ported: files and diffs (the shell has an editor and git), users, display preferences. Drafts if missed.                                                                 |
 
 ## Layout
 
@@ -35,7 +35,10 @@ shell. Claude Code works over that path, so this does too.
 ## Plain commands
 
 `am login [--name] [--url]` (the password from the prompt or
-`AGENT_MANAGER_PASSWORD`), `logout`, `projects`, `project new <name>
+`AGENT_MANAGER_PASSWORD`; inside an agent's session no login is needed:
+the manager puts `AGENT_MANAGER_URL` and `AGENT_MANAGER_TOKEN` in the
+environment, a token scoped to that agent's project, and `am` uses
+them when set, which is how an agent starts and drives helpers), `logout`, `projects`, `project new <name>
 <repo-path>... [--profile] [--host]` (the paths as on the manager's
 machine; relative ones are resolved here, which is that machine unless
 `--host` names a spoke), `project add-repo <project> <repo-path>...`
@@ -48,7 +51,10 @@ listed as skipped), `agents <project>`,
 [--steer] [--no-wait]`, `allow <agent> [--option ID]` / `deny <agent>`,
 `interrupt`, `stop`, `restart <agent>` (stop and resume that one
 agent with the current settings, conversation intact; the manager
-refuses it while the agent is busy), `features <project>`, `feature <project> <slug>`,
+refuses it while the agent is busy), `archive <agent>`, `delete
+<agent>` (forget it for good: process, daemon logs, cache and rows;
+the vendor's store stays), `agents <project> --archived` (the archived
+ones), `features <project>`, `feature <project> <slug>`,
 `respond <project> <slug> <text> [--status]`; `am help` (or `-h`) prints
 the usage, `am tui` is the same as `am` alone.
 

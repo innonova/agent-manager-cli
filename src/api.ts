@@ -25,14 +25,25 @@ export class Api {
   constructor(
     readonly url: string,
     public cookie: string | null = null,
+    /** An agent's own session token (AGENT_MANAGER_TOKEN) instead of a login. */
+    readonly bearer: string | null = null,
   ) {}
+
+  /** The credential as websocket headers. */
+  authHeaders(): Record<string, string> {
+    return this.bearer
+      ? { authorization: `Bearer ${this.bearer}` }
+      : this.cookie
+        ? { cookie: this.cookie }
+        : {}
+  }
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await fetch(this.url + path, {
       method,
       headers: {
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-        ...(this.cookie ? { cookie: this.cookie } : {}),
+        ...this.authHeaders(),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
@@ -85,7 +96,11 @@ export class Api {
       `/api/projects/${projectId}/agents/restart`,
       {},
     )
-  agents = (projectId: string) => this.call<AgentRow[]>('GET', `/api/projects/${projectId}/agents`)
+  agents = (projectId: string, archived = false) =>
+    this.call<AgentRow[]>(
+      'GET',
+      `/api/projects/${projectId}/agents${archived ? '?archived=1' : ''}`,
+    )
   agent = (id: string) =>
     this.call<{ agent: Agent; status: AgentStatus; sessions: unknown[] }>(
       'GET',
@@ -126,6 +141,8 @@ export class Api {
   /** Stops and resumes one agent with the current settings; the manager refuses (409) while it is busy. */
   restart = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/restart`, {})
   archive = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/archive`, {})
+  /** Forgets the agent for good: process, daemon logs, cache and rows. */
+  remove = (id: string) => this.call<{ ok: true }>('DELETE', `/api/agents/${id}`)
   profiles = () => this.call<{ profiles: Profile[] }>('GET', '/api/profiles')
 
   features = (projectId: string) =>

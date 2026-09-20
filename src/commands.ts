@@ -25,7 +25,7 @@ export const USAGE = `am — terminal client for agent-manager
   am project new <name> <repo-path>... [--profile P] [--host H]   (paths as on the manager's machine)
   am project add-repo <project> <repo-path>...
   am project restart <project>   restart the idle agents so they see the new repos
-  am agents <project>
+  am agents <project> [--archived]
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
   am tail <agent> [--lines N] [--follow] [--full]
   am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send;
@@ -36,12 +36,16 @@ export const USAGE = `am — terminal client for agent-manager
   am interrupt <agent>
   am stop <agent>
   am restart <agent>          stop and resume with the current settings; refused while busy
+  am archive <agent>          end its session and take it off the list (transcript kept)
+  am delete <agent>           forget it for good: process, daemon logs, cache; the vendor's store stays
   am features <project>
   am feature <project> <slug>
   am respond <project> <slug> <text...> [--status planned|review|blocked|done]
 
 An agent is an id, project/name, or a name unique across projects.
-The manager is ${'AGENT_MANAGER_URL'} or the one logged into (default http://127.0.0.1:4268).`
+The manager is ${'AGENT_MANAGER_URL'} or the one logged into (default http://127.0.0.1:4268).
+Inside an agent's session the manager sets AGENT_MANAGER_URL and AGENT_MANAGER_TOKEN: no login needed,
+and everything is scoped to that agent's project.`
 
 function stdIo(): Io {
   return {
@@ -108,9 +112,14 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       case 'project':
         return await project(rest, io)
       case 'agents': {
+        const { values, positionals } = parseArgs({
+          args: rest,
+          allowPositionals: true,
+          options: { archived: { type: 'boolean' } },
+        })
         const api = client()
-        const project = await findProject(api, need(rest[0], 'project'))
-        for (const { agent, status } of await api.agents(project.id)) {
+        const project = await findProject(api, need(positionals[0], 'project'))
+        for (const { agent, status } of await api.agents(project.id, values.archived ?? false)) {
           const extra = [
             agentFacts(agent, status),
             status.background ? `${status.background} bg` : '',
@@ -179,6 +188,20 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
         await api.restart(agent.id)
         io.out('restarted')
+        return 0
+      }
+      case 'archive': {
+        const api = client()
+        const { agent } = await findAgent(api, need(rest[0], 'agent'))
+        await api.archive(agent.id)
+        io.out('archived')
+        return 0
+      }
+      case 'delete': {
+        const api = client()
+        const { agent } = await findAgent(api, need(rest[0], 'agent'))
+        await api.remove(agent.id)
+        io.out('deleted')
         return 0
       }
       case 'features': {
@@ -345,7 +368,7 @@ async function tail(rest: string[], io: Io): Promise<number> {
   }
   for (const s of items) print(s)
   if (!values.follow) return 0
-  const events = new Events(api.url, api.cookie!)
+  const events = new Events(api.url, api.authHeaders())
   let lost = false
   await new Promise<void>((resolve) => {
     events.on('error', (e) => {
@@ -407,7 +430,7 @@ async function follow(
   total: number,
   io: Io,
 ): Promise<'ended' | 'error' | 'permission' | 'lost'> {
-  const events = new Events(api.url, api.cookie!)
+  const events = new Events(api.url, api.authHeaders())
   const printed = new Map<number, string>()
   let lastText = ''
   let outcome: 'ended' | 'error' | 'permission' | 'lost' | null = null

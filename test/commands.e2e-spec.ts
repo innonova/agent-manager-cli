@@ -117,6 +117,39 @@ describe('plain commands', () => {
     expect((await am(['projects'])).err[0]).toMatch(/not logged in/)
   })
 
+  it('inside an agent session the token in the environment logs in, scoped to the project', async () => {
+    // the token is in the agent's environment; the fake agent repeats it on a "token" turn
+    const api = new Api(backend.url)
+    await api.login('admin', ADMIN_PASSWORD)
+    const { agent } = await api.createAgent(projectId, { name: 'boss' })
+    await api.turn(agent.id, 'token please')
+    let token = ''
+    for (let i = 0; i < 100 && !token; i++) {
+      const { items } = await api.items(agent.id, { tail: 20 })
+      for (const it of items)
+        if (it.item.kind === 'text') token = /token ([0-9a-f]{64})/.exec(it.item.text)?.[1] ?? token
+      if (!token) await new Promise((r) => setTimeout(r, 100))
+    }
+    expect(token).toMatch(/^[0-9a-f]{64}$/)
+    process.env.AGENT_MANAGER_URL = backend.url
+    process.env.AGENT_MANAGER_TOKEN = token
+    try {
+      expect((await am(['projects'])).code).toBe(0) // no login: the token
+      const made = await am(['new', 'demo', 'helper'])
+      expect(made.code).toBe(0)
+      expect((await am(['agents', 'demo'])).text).toContain('helper')
+      expect((await am(['archive', 'helper'])).text).toContain('archived')
+      expect((await am(['agents', 'demo'])).text).not.toContain('helper')
+      expect((await am(['agents', 'demo', '--archived'])).text).toContain('helper')
+      expect((await am(['delete', 'helper'])).text).toContain('deleted')
+      expect((await am(['agents', 'demo', '--archived'])).text).not.toContain('helper')
+      expect((await am(['project', 'new', 'nope', backend.projectDir])).code).toBe(1) // outside the scope
+    } finally {
+      delete process.env.AGENT_MANAGER_URL
+      delete process.env.AGENT_MANAGER_TOKEN
+    }
+  })
+
   it('creates a project with several repos, adds one later and restarts its agents', async () => {
     process.env.AGENT_MANAGER_PASSWORD = ADMIN_PASSWORD
     expect((await am(['login', '--name', 'admin', '--url', backend.url])).code).toBe(0)

@@ -47,7 +47,10 @@ npm run lint && npm run format
 
 Completed work is committed, pushed and deployed without asking first;
 none of those needs approval, they need judgement. Complete means: does
-what was asked, tests and lint pass, `docs/design.md` updated for a
+what was asked, tests and lint pass at the gate (one feature worked
+alone is its own gate; a batch of several commits once per feature with
+the cheap checks and runs the full suite, lint and review once at the
+end, before the push), `docs/design.md` updated for a
 behaviour change and `README.md` for an operator-facing one. Then commit
 on `main`, push, deploy with `npm run install:cli` (it only rebuilds and
 relinks `am`; nothing running is touched), and say so in the summary.

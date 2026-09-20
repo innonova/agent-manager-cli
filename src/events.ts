@@ -3,7 +3,7 @@ import WebSocket from 'ws'
 import type { EventFrame } from './types.js'
 
 /**
- * The manager's event stream over its websocket, with the login cookie.
+ * The manager's event stream over its websocket, with the login cookie or an agent's token.
  * Reconnects with backoff until closed; `frame` for every frame, `open`
  * after each (re)connection, `close` when one drops.
  */
@@ -22,7 +22,7 @@ export class Events extends EventEmitter<{
 
   constructor(
     private readonly url: string,
-    private readonly cookie: string,
+    private readonly headers: Record<string, string>,
   ) {
     super()
   }
@@ -30,7 +30,7 @@ export class Events extends EventEmitter<{
   connect(): void {
     if (this.closed) return
     const target = this.url.replace(/^http/, 'ws') + '/api/events'
-    const ws = new WebSocket(target, { headers: { cookie: this.cookie } })
+    const ws = new WebSocket(target, { headers: this.headers })
     this.ws = ws
     ws.on('open', () => {
       this.attempt = 0
