@@ -25,6 +25,9 @@ async function am(args: string[], answers: string[] = []) {
 }
 
 beforeAll(async () => {
+  // under an agent's session these point `am` at the real manager; the tests drive their own
+  delete process.env.AGENT_MANAGER_TOKEN
+  delete process.env.AGENT_MANAGER_URL
   backend = await startBackend()
   process.env.AGENT_MANAGER_CLI_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'am-cli-cfg-'))
   const api = new Api(backend.url)
@@ -68,6 +71,23 @@ describe('plain commands', () => {
     expect(turned.code).toBe(0)
     expect(turned.text).toContain('You said: hello there')
     expect(turned.text).toContain('turn end')
+    // quiet: the answer and the turn-end line, nothing of the run itself
+    const quiet = await am(['turn', 'demo/worker', 'again', '--quiet'])
+    expect(quiet.code).toBe(0)
+    expect(quiet.out).toHaveLength(2)
+    expect(quiet.out[0]).toMatch(/^You said: again/)
+    expect(quiet.out[1]).toContain('turn end')
+    // wait with nothing under way: the last answer, from the transcript
+    const waited = await am(['wait', 'worker'])
+    expect(waited.code).toBe(0)
+    expect(waited.out[0]).toMatch(/^You said: again/)
+    expect(waited.out[1]).toContain('turn end')
+    // wait during a turn: sent without waiting, then collected
+    expect((await am(['turn', 'demo/worker', 'slow please', '--no-wait'])).code).toBe(0)
+    const collected = await am(['wait', 'worker'])
+    expect(collected.code).toBe(0)
+    expect(collected.out[0]).toContain('deliberately slow')
+    expect(collected.out[1]).toContain('turn end')
     const tailed = await am(['tail', 'worker', '--lines', '3'])
     expect(tailed.code).toBe(0)
     expect(tailed.out.length).toBe(3)

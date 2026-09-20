@@ -29,8 +29,11 @@ export const USAGE = `am — terminal client for agent-manager
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
   am tail <agent> [--lines N] [--follow] [--full]
   am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send;
+                              --quiet: print only the final answer and the turn's cost;
                               --steer: while a turn runs, deliver it into the turn or queue it;
                               --image FILE: send an image along, repeatable; png/jpeg/gif/webp)
+  am wait <agent>             wait for the turn under way to end, then print its final answer
+                              and cost (the last turn's, if none is under way)
   am allow <agent> [--option ID]   answer the pending permission (first allow option by default)
   am deny <agent>             both print the rest of the turn unless --no-wait
   am interrupt <agent>
@@ -183,6 +186,8 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         io.out('stopped')
         return 0
       }
+      case 'wait':
+        return await wait(rest, io)
       case 'restart': {
         const api = client()
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
@@ -429,6 +434,7 @@ async function follow(
   agent: Agent,
   total: number,
   io: Io,
+  quiet = false,
 ): Promise<'ended' | 'error' | 'permission' | 'lost'> {
   const events = new Events(api.url, api.authHeaders())
   const printed = new Map<number, string>()
@@ -445,7 +451,13 @@ async function follow(
       if (s.item.text === lastText) return
       lastText = s.item.text
     }
-    io.out(line)
+    // quiet: the run is not printed, only what it came to (the final answer) and how it ended
+    if (!quiet) io.out(line)
+    else if (s.item.kind === 'turn_end') {
+      if (lastText) io.out(lastText)
+      io.out(line)
+    } else if (s.item.kind === 'error' || (s.item.kind === 'permission' && !s.item.decision))
+      io.out(line)
     if (s.item.kind === 'turn_end') settle('ended')
     else if (s.item.kind === 'error') settle('error')
     else if (s.item.kind === 'system' && s.item.text.startsWith('session ended')) settle('ended')
@@ -511,6 +523,7 @@ async function turn(rest: string[], io: Io): Promise<number> {
     allowPositionals: true,
     options: {
       'no-wait': { type: 'boolean' },
+      quiet: { type: 'boolean' },
       steer: { type: 'boolean' },
       image: { type: 'string', multiple: true },
     },
@@ -530,7 +543,39 @@ async function turn(rest: string[], io: Io): Promise<number> {
     io.out(mode)
     return 0
   }
-  return (await follow(api, agent, total, io)) === 'error' ? 1 : 0
+  return (await follow(api, agent, total, io, values.quiet ?? false)) === 'error' ? 1 : 0
+}
+
+/**
+ * The turn under way, waited out: its final answer and how it ended, as
+ * `turn --quiet` prints them. Pairs with `turn --no-wait` for a caller
+ * that sends, does something else and collects later. With no turn under
+ * way, the last turn's answer is printed straight from the transcript.
+ */
+async function wait(rest: string[], io: Io): Promise<number> {
+  const api = client()
+  const { agent, status } = await findAgent(api, need(rest[0], 'agent'))
+  // the turn's items start after its user message: the last one in the tail
+  const { items, total } = await api.items(agent.id, { tail: 200 })
+  let from = Math.max(0, total - items.length)
+  for (const s of items) if (s.item.kind === 'user') from = s.index + 1
+  if (
+    status.state === 'working' ||
+    status.state === 'waiting-permission' ||
+    status.state === 'starting'
+  )
+    return (await follow(api, agent, from, io, true)) === 'error' ? 1 : 0
+  let lastText = ''
+  let end: StoredItem | null = null
+  for (const s of items) {
+    if (s.index < from) continue
+    if (s.item.kind === 'text' && !s.item.streaming) lastText = s.item.text
+    if (s.item.kind === 'turn_end' || s.item.kind === 'error') end = s
+  }
+  if (lastText) io.out(lastText)
+  if (end) io.out(renderItem(end))
+  else if (!lastText) io.out(dim('nothing to wait for and no answer yet'))
+  return end?.item.kind === 'error' ? 1 : 0
 }
 
 async function decide(cmd: 'allow' | 'deny', rest: string[], io: Io): Promise<number> {

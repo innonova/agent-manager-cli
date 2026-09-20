@@ -14,6 +14,9 @@ let cfg: string
 const plain = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/\r/g, '')
 
 beforeAll(async () => {
+  // under an agent's session these point `am` at the real manager; the tests drive their own
+  delete process.env.AGENT_MANAGER_TOKEN
+  delete process.env.AGENT_MANAGER_URL
   backend = await startBackend()
   cfg = fs.mkdtempSync(path.join(os.tmpdir(), 'am-cli-cfg-'))
   process.env.AGENT_MANAGER_CLI_CONFIG_DIR = cfg

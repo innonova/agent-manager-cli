@@ -59,7 +59,14 @@ ones), `features <project>`, `feature <project> <slug>`,
 the usage, `am tui` is the same as `am` alone.
 
 `turn`, `allow` and `deny` print the turn as it runs and return when it
-ends, errors, or stops to ask a permission (`--no-wait` just sends).
+ends, errors, or stops to ask a permission (`--no-wait` just sends;
+`turn --quiet` prints only the final answer, the turn-end line with
+its duration and cost, and an error or a permission request if the
+turn stopped there: a return value for an agent that delegated the
+turn). `wait <agent>` waits out the turn under way and prints the
+same, or the last turn's answer straight from the transcript when
+none is under way; with `turn --no-wait` it lets a caller send, do
+something else and collect later.
 `turn --steer` while a turn runs delivers the message into it, or queues
 it for the next turn where the vendor cannot take one; the TUI's
 composer does the same by itself while the agent works. `turn --image
