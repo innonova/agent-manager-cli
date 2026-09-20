@@ -77,4 +77,4 @@ cannot continue), commit the file with the work, never edit the other
 frontmatter fields, and do not create or edit feature files otherwise
 unless asked. The convention is in `../agent-manager/docs/design.md`;
 the practice around it, including how agents delegate to helpers, is
-`../agent-manager/docs/method.md`.
+`../agent-manager/method.md` (what `am method` prints).
