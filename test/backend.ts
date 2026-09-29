@@ -82,6 +82,7 @@ export async function startBackend(): Promise<Backend> {
       AGENT_MANAGER_MODELS_FILE: path.join(root, 'models.md'),
       AGENT_MANAGER_METHOD_FILE: path.join(root, 'method.md'),
       AGENT_MANAGER_FRAMING_FILE: path.join(root, 'framing.md'),
+      AGENT_MANAGER_WORKSPACES_DIR: path.join(root, 'workspaces'), // nor a workspace file beside a real repository
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
