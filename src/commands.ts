@@ -119,6 +119,10 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
             .join(', ')
           io.out(`${bold(project.name)}  ${dim(project.id)}  ${counts ? dim(counts) : ''}`)
           for (const r of project.repos) io.out(`  ${r.name}  ${dim(r.path)}`)
+          if (project.workspace)
+            io.out(
+              `  ${dim('workspace')}  ${dim(project.workspace)}${project.sshHost ? dim(`  (code --remote ssh-remote+${project.sshHost} ${project.workspace})`) : ''}`,
+            )
         }
         return 0
       }
@@ -445,9 +449,7 @@ async function project(rest: string[], io: Io): Promise<number> {
     }
     default:
       throw new UsageError(
-        sub
-          ? `unknown project command "${sub}"`
-          : 'project needs new, add-repo, set or restart',
+        sub ? `unknown project command "${sub}"` : 'project needs new, add-repo, set or restart',
       )
   }
 }

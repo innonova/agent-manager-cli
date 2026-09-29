@@ -1,8 +1,7 @@
 ---
 title: am turn --quiet returns the answer, not the narration
-status: review
+status: done
 priority: 3
-dependsOn: []
 ---
 
 ## Purpose

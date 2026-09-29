@@ -60,6 +60,10 @@ export interface Project {
   createdAt: number
   /** The machine it is on, when the manager is a hub. */
   host?: string
+  /** How a person's machine reaches that one over SSH, for opening the project in an editor. */
+  sshHost?: string
+  /** The VS Code workspace file the manager keeps beside the repositories. */
+  workspace?: string
 }
 export type AgentState =
   'starting' | 'idle' | 'working' | 'waiting-input' | 'waiting-permission' | 'error' | 'exited'
