@@ -5,6 +5,7 @@ import readline from 'node:readline'
 import { Api, ApiError } from './api.js'
 import { clearSession, loadSession, managerUrl, saveSession } from './config.js'
 import { client, findAgent, findProject } from './client.js'
+import { holdText, parseUntil } from './until.js'
 import { Events } from './events.js'
 import { agentFacts, bold, dim, renderItem, stateMark } from './render.js'
 import { answerTexts } from './quiet.js'
@@ -37,6 +38,9 @@ export const USAGE = `am — terminal client for agent-manager
                               --image FILE: send an image along, repeatable; png/jpeg/gif/webp)
   am wait <agent>             wait for the turn under way to end, then print its final answer
                               and cost (the last turn's, if none is under way)
+  am hold [<agent>] <until>   tell the manager a background wait is expected until then, so it
+                              does not ask about it before: a time (13:30), a duration (45m, 2h,
+                              1d) or off; inside an agent's session the agent is itself
   am allow <agent> [--option ID]   answer the pending permission (first allow option by default)
   am deny <agent>             both print the rest of the turn unless --no-wait
   am interrupt <agent>
@@ -202,6 +206,20 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       }
       case 'wait':
         return await wait(rest, io)
+      case 'hold': {
+        const api = client()
+        const [first, second] = rest
+        const ref = second !== undefined ? first : process.env.AGENT_MANAGER_AGENT
+        const untilText = second ?? first
+        if (!ref || !untilText)
+          throw new Error(
+            "am hold [<agent>] <until>: the agent is implied only inside an agent's session",
+          )
+        const { agent } = await findAgent(api, ref)
+        const { holdUntil } = await api.hold(agent.id, parseUntil(untilText))
+        io.out(holdText(holdUntil))
+        return 0
+      }
       case 'restart': {
         const api = client()
         const { agent } = await findAgent(api, need(rest[0], 'agent'))

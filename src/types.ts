@@ -87,6 +87,8 @@ export interface AgentStatus {
   error: string | null
   lastActivityAt: number
   background: number
+  /** Until when the agent said its background wait is expected; the manager's poke waits for it. */
+  holdUntil?: number | null
   model: string | null
   queued: number
   usage: {

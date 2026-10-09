@@ -141,6 +141,9 @@ export class Api {
   decide = (id: string, requestId: string, option: string) =>
     this.call<{ ok: true }>('POST', `/api/agents/${id}/permission`, { requestId, option })
   interrupt = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/interrupt`, {})
+  /** Holds the manager's background poke until `until` (unix ms); null clears. */
+  hold = (id: string, until: number | null) =>
+    this.call<{ ok: true; holdUntil: number | null }>('POST', `/api/agents/${id}/hold`, { until })
   stop = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/stop`, {})
   /** Stops and resumes one agent with the current settings; the manager refuses (409) while it is busy. */
   restart = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/restart`, {})
