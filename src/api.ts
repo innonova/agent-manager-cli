@@ -140,6 +140,21 @@ export class Api {
     })
   decide = (id: string, requestId: string, option: string) =>
     this.call<{ ok: true }>('POST', `/api/agents/${id}/permission`, { requestId, option })
+  /** Edits an agent's record; `appliesAtRestart` names the settings that wait for its next session start. */
+  updateAgent = (
+    id: string,
+    patch: {
+      name?: string
+      model?: string | null
+      effort?: string | null
+      permissions?: 'bypass' | 'ask'
+    },
+  ) =>
+    this.call<{ agent: AgentRow['agent']; status: AgentStatus; appliesAtRestart: string[] }>(
+      'PATCH',
+      `/api/agents/${id}`,
+      patch,
+    )
   interrupt = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/interrupt`, {})
   /** Holds the manager's background poke until `until` (unix ms); null clears. */
   hold = (id: string, until: number | null) =>

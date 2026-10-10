@@ -45,6 +45,8 @@ export const USAGE = `am — terminal client for agent-manager
   am deny <agent>             both print the rest of the turn unless --no-wait
   am interrupt <agent>
   am stop <agent>
+  am set <agent> [--name N] [--model M] [--effort E] [--ask|--bypass]
+                              edit the agent; model, effort and permissions apply at its next restart
   am restart <agent>          stop and resume with the current settings; refused while busy
   am archive <agent>          end its session and take it off the list (transcript kept)
   am delete <agent>           forget it for good: process, daemon logs, cache; the vendor's store stays
@@ -206,6 +208,38 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       }
       case 'wait':
         return await wait(rest, io)
+      case 'set': {
+        const { values, positionals } = parseArgs({
+          args: rest,
+          allowPositionals: true,
+          options: {
+            name: { type: 'string' },
+            model: { type: 'string' },
+            effort: { type: 'string' },
+            ask: { type: 'boolean' },
+            bypass: { type: 'boolean' },
+          },
+        })
+        const api = client()
+        const { agent } = await findAgent(api, need(positionals[0], 'agent'))
+        const patch: Parameters<typeof api.updateAgent>[1] = {}
+        if (values.name !== undefined) patch.name = values.name
+        if (values.model !== undefined) patch.model = values.model || null
+        if (values.effort !== undefined) patch.effort = values.effort || null
+        if (values.ask) patch.permissions = 'ask'
+        else if (values.bypass) patch.permissions = 'bypass'
+        if (Object.keys(patch).length === 0)
+          throw new Error('nothing to set (--name, --model, --effort, --ask, --bypass)')
+        const r = await api.updateAgent(agent.id, patch)
+        io.out(agentFacts(r.agent, r.status))
+        if (r.appliesAtRestart.length)
+          io.out(
+            dim(
+              `${r.appliesAtRestart.join(', ')} take effect after \`am restart ${r.agent.name}\``,
+            ),
+          )
+        return 0
+      }
       case 'hold': {
         const api = client()
         const [first, second] = rest
