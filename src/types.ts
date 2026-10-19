@@ -73,6 +73,8 @@ export interface Agent {
   projectId: string
   name: string
   profile: string
+  /** The machine its sessions run on: null for the project's own, else a spoke's name. */
+  host?: string | null
   cwd: string
   vendorConversationId: string | null
   currentSessionId: string | null

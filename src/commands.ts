@@ -30,6 +30,8 @@ export const USAGE = `am — terminal client for agent-manager
   am project restart <project>   restart the idle agents so they see the new repos
   am agents <project> [--archived]
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
+                              [--host H]: run the agent's session on that machine (a spoke), with
+                              --cwd an absolute path there; the project stays here
   am tail <agent> [--lines N] [--follow] [--full]
   am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send;
                               --quiet: print the agent's answer (its texts, minus the
@@ -169,20 +171,26 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
             cwd: { type: 'string' },
             model: { type: 'string' },
             effort: { type: 'string' },
+            host: { type: 'string' },
           },
         })
         const api = client()
         const project = await findProject(api, need(positionals[0], 'project'))
         const name = need(positionals[1], 'name')
+        if (values.host && !values.cwd)
+          throw new Error('--host needs --cwd: an absolute path on that machine')
         const { agent, status } = await api.createAgent(project.id, {
           name,
+          ...(values.host ? { host: values.host } : {}),
           ...(values.profile ? { profile: values.profile } : {}),
           ...(values.ask ? { permissions: 'ask' as const } : {}),
           ...(values.cwd ? { cwd: values.cwd } : {}),
           ...(values.model ? { model: values.model } : {}),
           ...(values.effort ? { effort: values.effort } : {}),
         })
-        io.out(`${stateMark(status.state)} ${bold(agent.name)}  ${dim(agent.id)}  ${agent.profile}`)
+        io.out(
+          `${stateMark(status.state)} ${bold(agent.name)}  ${dim(agent.id)}  ${agent.profile}${agent.host ? dim(`  on ${agent.host}`) : ''}`,
+        )
         return 0
       }
       case 'tail':

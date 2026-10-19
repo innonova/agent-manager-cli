@@ -114,6 +114,7 @@ export class Api {
     projectId: string,
     input: {
       name: string
+      host?: string
       profile?: string
       cwd?: string
       permissions?: 'bypass' | 'ask'
