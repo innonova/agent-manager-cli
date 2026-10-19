@@ -16,7 +16,8 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "lint": "oxlint src/ test/",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"test/**/*.ts\"",
-    "install:cli": "scripts/install-cli.sh"
+    "install:cli": "scripts/install-cli.sh",
+    "install:windows": "powershell -ExecutionPolicy Bypass -File scripts/install-windows.ps1"
   },
   "license": "MIT",
   "engines": {
