@@ -4,6 +4,7 @@ import type {
   AgentStatus,
   Feature,
   Learning,
+  Notes,
   Profile,
   Project,
   Run,
@@ -192,6 +193,13 @@ export class Api {
       `/api/runs?limit=${limit}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`,
     )
 
+  notes = (projectId: string) => this.call<Notes>('GET', `/api/projects/${projectId}/notes`)
+  addNote = (projectId: string, text: string) =>
+    this.call<Notes>('POST', `/api/projects/${projectId}/notes`, { text })
+  updateNote = (projectId: string, id: string, patch: { done?: boolean; text?: string }) =>
+    this.call<Notes>('PATCH', `/api/projects/${projectId}/notes/${id}`, patch)
+  removeNote = (projectId: string, id: string) =>
+    this.call<Notes>('DELETE', `/api/projects/${projectId}/notes/${id}`)
   features = (projectId: string) =>
     this.call<{ features: Feature[] }>('GET', `/api/projects/${projectId}/features`)
   feature = (projectId: string, slug: string) =>

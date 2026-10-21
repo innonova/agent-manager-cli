@@ -180,3 +180,17 @@ export type EventFrame =
   | { type: 'feature.changed'; projectId: string; feature: Feature }
   | { type: 'presence'; agents: Record<string, PresenceUser[]> }
   | { type: string }
+
+/** A small actionable item about the project: one file under `notes/` in the primary repository. */
+export interface NoteItem {
+  id: string
+  done: boolean
+  date: string
+  title: string
+  body: string
+}
+export interface Notes {
+  dir: string
+  items: NoteItem[]
+  open: number
+}

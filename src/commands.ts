@@ -59,6 +59,10 @@ export const USAGE = `am — terminal client for agent-manager
   am runs [project]           the run log: feature, agent and model, duration, commits, cost, outcome
   am runs review <run-id> --outcome accepted|sent-back [--cause model|brief|doc] [--note TEXT]
                               close the loop on a run: a cause is required when sending back
+  am notes [<project>] [--all]   the project's notes: small actionable items, open ones with their ids
+  am note add [<project>] <text...>   add one (the first line is the title)
+  am note done|undo|drop [<project>] <id>   tick, reopen or remove one
+                              (inside an agent's session the project is implied)
   am features <project>
   am feature <project> <slug>
   am respond <project> <slug> <text...> [--status planned|review|blocked|done]
@@ -370,6 +374,64 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
           )
         }
         return 0
+      }
+      case 'notes': {
+        const { values, positionals } = parseArgs({
+          args: rest,
+          allowPositionals: true,
+          options: { all: { type: 'boolean' } },
+        })
+        const api = client()
+        const project = await findProject(api, projectRef(positionals[0]))
+        const { items } = await api.notes(project.id)
+        const shown = values.all ? items : items.filter((n) => !n.done)
+        if (shown.length === 0) io.out(dim(values.all ? 'no notes' : 'no open notes'))
+        for (const n of shown) {
+          io.out(`${n.done ? dim('[x]') : '[ ]'} ${bold(n.id)}  ${n.title}  ${dim(n.date)}`)
+          if (n.body) for (const l of n.body.split('\n')) io.out(`           ${dim(l)}`)
+        }
+        return 0
+      }
+      case 'note': {
+        const api = client()
+        const [verb, ...args] = rest
+        if (verb === 'add') {
+          // with a project name first when given, else the session's project and all of it is the text
+          let projectName: string | undefined
+          let textParts = args
+          if (args.length > 1 && !process.env.AGENT_MANAGER_PROJECT) {
+            projectName = args[0]
+            textParts = args.slice(1)
+          } else if (args.length > 1) {
+            try {
+              await findProject(api, args[0]!)
+              projectName = args[0]
+              textParts = args.slice(1)
+            } catch {
+              /* the first word is part of the note */
+            }
+          }
+          const project = await findProject(api, projectRef(projectName))
+          const text = textParts.join(' ').trim()
+          if (!text) throw new Error('am note add [<project>] <text>')
+          const { items } = await api.addNote(project.id, text)
+          const added = items.find((n) => n.title === text.split('\n')[0]!.trim() && !n.done)
+          io.out(`added ${bold(added?.id ?? '?')}  ${text.split('\n')[0]}`)
+          return 0
+        }
+        if (verb === 'done' || verb === 'undo' || verb === 'drop') {
+          const [a, b] = args
+          const id = b ?? a
+          const project = await findProject(api, projectRef(b ? a : undefined))
+          if (!id) throw new Error(`am note ${verb} [<project>] <id>`)
+          if (verb === 'drop') await api.removeNote(project.id, id)
+          else await api.updateNote(project.id, id, { done: verb === 'done' })
+          io.out(
+            `${verb === 'done' ? 'ticked' : verb === 'undo' ? 'reopened' : 'removed'} ${bold(id)}`,
+          )
+          return 0
+        }
+        throw new Error('am note add|done|undo|drop …')
       }
       case 'features': {
         const api = client()
@@ -754,6 +816,13 @@ async function turn(rest: string[], io: Io): Promise<number> {
  * that sends, does something else and collects later. With no turn under
  * way, the last turn's answer is printed straight from the transcript.
  */
+/** A project named on the command line, else the one an agent's session carries (AGENT_MANAGER_PROJECT). */
+function projectRef(given: string | undefined): string {
+  const ref = given ?? process.env.AGENT_MANAGER_PROJECT
+  if (!ref) throw new Error("name the project (or run inside an agent's session, which implies it)")
+  return ref
+}
+
 async function wait(rest: string[], io: Io): Promise<number> {
   const api = client()
   const { agent, status } = await findAgent(api, need(rest[0], 'agent'))
