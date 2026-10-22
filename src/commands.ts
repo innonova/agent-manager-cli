@@ -40,6 +40,10 @@ export const USAGE = `am — terminal client for agent-manager
                               --image FILE: send an image along, repeatable; png/jpeg/gif/webp)
   am wait <agent>             wait for the turn under way to end, then print its final answer
                               and cost (the last turn's, if none is under way)
+  am exec <host> [--cwd DIR] [--timeout SECONDS] -- <command...>
+                              run one command on that machine through its daemon, in the session
+                              the daemon runs in (the logged-in desktop on Windows); prints the
+                              output and exits with the command's exit code
   am hold [<agent>] <until>   tell the manager a background wait is expected until then, so it
                               does not ask about it before: a time (13:30), a duration (45m, 2h,
                               1d) or off; inside an agent's session the agent is itself
@@ -251,6 +255,28 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
             ),
           )
         return 0
+      }
+      case 'exec': {
+        const dash = rest.indexOf('--')
+        const own = dash >= 0 ? rest.slice(0, dash) : rest
+        const command = dash >= 0 ? rest.slice(dash + 1).join(' ') : ''
+        const { values, positionals } = parseArgs({
+          args: own,
+          allowPositionals: true,
+          options: { cwd: { type: 'string' }, timeout: { type: 'string' } },
+        })
+        const host = need(positionals[0], 'host')
+        if (!command.trim()) throw new Error('am exec <host> [--cwd DIR] -- <command...>')
+        const api = client()
+        const r = await api.exec(host, command, {
+          ...(values.cwd ? { cwd: values.cwd } : {}),
+          ...(values.timeout ? { timeoutMs: Number(values.timeout) * 1000 } : {}),
+        })
+        if (r.stdout) io.out(r.stdout.replace(/\n$/, ''))
+        if (r.stderr) io.err(r.stderr.replace(/\n$/, ''))
+        if (r.timedOut)
+          io.err(dim(`killed after the timeout (${Math.round(r.durationMs / 1000)}s)`))
+        return r.timedOut ? 124 : (r.exitCode ?? 1)
       }
       case 'hold': {
         const api = client()

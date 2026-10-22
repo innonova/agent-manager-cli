@@ -193,6 +193,17 @@ export class Api {
       `/api/runs?limit=${limit}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`,
     )
 
+  /** One command on a host through its daemon's shell profile: the output back, in the session the daemon runs in. */
+  exec = (host: string, command: string, opts: { cwd?: string; timeoutMs?: number } = {}) =>
+    this.call<{
+      host: string
+      exitCode: number | null
+      signal: string | null
+      stdout: string
+      stderr: string
+      durationMs: number
+      timedOut: boolean
+    }>('POST', `/api/hosts/${encodeURIComponent(host)}/exec`, { command, ...opts })
   notes = (projectId: string) => this.call<Notes>('GET', `/api/projects/${projectId}/notes`)
   addNote = (projectId: string, text: string) =>
     this.call<Notes>('POST', `/api/projects/${projectId}/notes`, { text })
