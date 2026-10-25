@@ -158,6 +158,7 @@ export class Api {
       patch,
     )
   interrupt = (id: string) => this.call<{ ok: true }>('POST', `/api/agents/${id}/interrupt`, {})
+  undo = (id: string) => this.call<{ withdrawn: number }>('POST', `/api/agents/${id}/undo`, {})
   /** Holds the manager's background poke until `until` (unix ms); null clears. */
   hold = (id: string, until: number | null) =>
     this.call<{ ok: true; holdUntil: number | null }>('POST', `/api/agents/${id}/hold`, { until })

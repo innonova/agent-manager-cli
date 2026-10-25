@@ -49,6 +49,8 @@ export const USAGE = `am — terminal client for agent-manager
                               1d) or off; inside an agent's session the agent is itself
   am allow <agent> [--option ID]   answer the pending permission (first allow option by default)
   am deny <agent>             both print the rest of the turn unless --no-wait
+  am undo <agent>             take back the last message sent to a Claude agent: it will have no
+                              memory of it or of its reply; refused when the reply did more than read
   am interrupt <agent>
   am stop <agent>
   am set <agent> [--name N] [--model M] [--effort E] [--ask|--bypass]
@@ -208,6 +210,15 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       case 'allow':
       case 'deny':
         return await decide(cmd, rest, io)
+      case 'undo': {
+        const api = client()
+        const { agent } = await findAgent(api, need(rest[0], 'agent'))
+        const { withdrawn } = await api.undo(agent.id)
+        io.out(
+          `withdrawn: the last message and its reply (${withdrawn} records of the conversation)`,
+        )
+        return 0
+      }
       case 'interrupt': {
         const api = client()
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
