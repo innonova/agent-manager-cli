@@ -12,13 +12,14 @@ let projectId: string
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
 
 /** Runs a command with captured output and a scripted stdin. */
-async function am(args: string[], answers: string[] = []) {
+async function am(args: string[], answers: string[] = [], stdin: string | null = null) {
   const out: string[] = []
   const err: string[] = []
   const io: Io = {
     out: (l) => out.push(strip(l)),
     err: (l) => err.push(strip(l)),
     ask: async () => answers.shift() ?? '',
+    stdin: async () => stdin,
   }
   const code = await run(args, io)
   return { code, out, err, text: out.join('\n') }
@@ -59,6 +60,25 @@ describe('plain commands', () => {
     expect(p.code).toBe(0)
     expect(p.text).toContain('demo')
     expect(p.text).toContain(projectId)
+  })
+
+  it('exec: one argument verbatim, several re-quoted, or the command on stdin', async () => {
+    const one = await am(['exec', os.hostname(), '--', 'printf "%s|" "a  b" $((1+1)); exit 3'])
+    expect(one.text).toBe('a  b|2|')
+    expect(one.code).toBe(3)
+    // the caller's shell has stripped the quotes from these words; the spaced one is quoted again
+    const many = await am(['exec', os.hostname(), '--', 'printf', '%s|', 'a  b', 'c'])
+    expect(many.text).toBe('a  b|c|')
+    const piped = await am(
+      ['exec', os.hostname()],
+      [],
+      "printf '%s|' \"it's\" 'q\"q'\nprintf 'line2'\n",
+    )
+    expect(piped.text).toBe('it\'s|q"q|line2')
+    expect(piped.code).toBe(0)
+    const nothing = await am(['exec', os.hostname()], [], '')
+    expect(nothing.code).toBe(1)
+    expect(nothing.err[0]).toMatch(/stdin/)
   })
 
   it('creates an agent, sends a turn and tails the transcript', async () => {
@@ -227,7 +247,14 @@ describe('plain commands', () => {
     expect((await am(['login', '--name', 'admin', '--url', backend.url])).code).toBe(0)
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'am-cli-deleg-'))
     fs.mkdirSync(path.join(base, 'r'))
-    const made = await am(['project', 'new', 'guarded', path.join(base, 'r'), '--delegation', 'on-request'])
+    const made = await am([
+      'project',
+      'new',
+      'guarded',
+      path.join(base, 'r'),
+      '--delegation',
+      'on-request',
+    ])
     expect(made.code).toBe(0)
     // set it back to free
     const set = await am(['project', 'set', 'guarded', '--delegation', 'free'])

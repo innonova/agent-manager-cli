@@ -16,6 +16,8 @@ export interface Io {
   err: (line: string) => void
   /** Reads a line from the user; `hidden` for passwords. */
   ask: (prompt: string, hidden?: boolean) => Promise<string>
+  /** Everything on stdin, or null when stdin is a terminal (nothing was piped in). */
+  stdin?: () => Promise<string | null>
 }
 
 export const USAGE = `am — terminal client for agent-manager
@@ -43,7 +45,10 @@ export const USAGE = `am — terminal client for agent-manager
   am exec <host> [--cwd DIR] [--timeout SECONDS] -- <command...>
                               run one command on that machine through its daemon, in the session
                               the daemon runs in (the logged-in desktop on Windows); prints the
-                              output and exits with the command's exit code
+                              output and exits with the command's exit code. One word after --
+                              goes as it is; several are joined, words with spaces quoted. With
+                              no -- the command is read from stdin, quotes and lines untouched:
+                              am exec <host> <<'EOF' ... EOF
   am hold [<agent>] <until>   tell the manager a background wait is expected until then, so it
                               does not ask about it before: a time (13:30), a duration (45m, 2h,
                               1d) or off; inside an agent's session the agent is itself
@@ -78,10 +83,37 @@ The manager is ${'AGENT_MANAGER_URL'} or the one logged into (default http://127
 Inside an agent's session the manager sets AGENT_MANAGER_URL and AGENT_MANAGER_TOKEN: no login needed,
 and everything is scoped to that agent's project.`
 
+/**
+ * The words after `--` as one command line for the host's shell. One word
+ * is the command as the caller wrote it (the usual form: the whole
+ * command in one quoted argument). Several words come from the caller's
+ * shell, which has eaten their quotes: a word with whitespace, a quote
+ * or a shell character in it could only have arrived quoted, so the
+ * caller meant it literally, and it is quoted again, in single quotes,
+ * which bash and PowerShell both read literally. `$` is left alone, so
+ * a variable reaches the host's shell as one. A single quote inside
+ * such a word is doubled, PowerShell's escape; bash has none inside
+ * single quotes, so there the one-argument or stdin form is the way.
+ * Shell syntax meant for the host (a pipe, a redirect, a second
+ * command) belongs in the one-argument or stdin form too.
+ */
+export function joinCommand(words: string[]): string {
+  if (words.length <= 1) return words[0] ?? ''
+  return words
+    .map((w) => (/[\s"'|&;<>()*?[\]{}#~!\\`]/.test(w) ? `'${w.replace(/'/g, "''")}'` : w))
+    .join(' ')
+}
+
 function stdIo(): Io {
   return {
     out: (l) => process.stdout.write(l + '\n'),
     err: (l) => process.stderr.write(l + '\n'),
+    stdin: async () => {
+      if (process.stdin.isTTY) return null
+      const chunks: Buffer[] = []
+      for await (const c of process.stdin) chunks.push(c as Buffer)
+      return Buffer.concat(chunks).toString('utf8')
+    },
     ask: (prompt, hidden = false) =>
       new Promise((resolve) => {
         const rl = readline.createInterface({
@@ -270,14 +302,17 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       case 'exec': {
         const dash = rest.indexOf('--')
         const own = dash >= 0 ? rest.slice(0, dash) : rest
-        const command = dash >= 0 ? rest.slice(dash + 1).join(' ') : ''
         const { values, positionals } = parseArgs({
           args: own,
           allowPositionals: true,
           options: { cwd: { type: 'string' }, timeout: { type: 'string' } },
         })
         const host = need(positionals[0], 'host')
-        if (!command.trim()) throw new Error('am exec <host> [--cwd DIR] -- <command...>')
+        const command = dash >= 0 ? joinCommand(rest.slice(dash + 1)) : ((await io.stdin?.()) ?? '')
+        if (!command.trim())
+          throw new Error(
+            "am exec <host> [--cwd DIR] -- <command...>, or the command on stdin (am exec <host> <<'EOF')",
+          )
         const api = client()
         const r = await api.exec(host, command, {
           ...(values.cwd ? { cwd: values.cwd } : {}),

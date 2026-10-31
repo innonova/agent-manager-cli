@@ -26,6 +26,10 @@ export async function startBackend(): Promise<Backend> {
     path.join(daemonConfig, 'profiles', 'fake.json'),
     JSON.stringify({ command: process.execPath, args: [FAKE_AGENT], description: 'fake agent' }),
   )
+  fs.writeFileSync(
+    path.join(daemonConfig, 'profiles', 'shell.json'),
+    JSON.stringify({ command: 'bash', args: ['-c'], description: 'a shell for exec' }),
+  )
   const projectDir = path.join(root, 'project')
   fs.mkdirSync(projectDir)
   fs.writeFileSync(path.join(projectDir, 'README.md'), '# demo\n')
