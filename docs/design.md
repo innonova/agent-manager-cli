@@ -115,6 +115,12 @@ compaction, and prints the notice that names the files to read; `--weigh` runs t
 with another model, which is how one is tried. Inside an agent's
 session the agent is itself; elsewhere `--agent` names it.
 
+`am compact <agent>` asks the manager to compact an agent's context
+now: the dialog is weighed first when it has grown since the last
+time, then the vendor's own compaction is sent as a turn. It is the
+terminal's form of the UI's compact button, and refused while the
+agent is in a turn.
+
 ## TUI
 
 `am` with no arguments. Three screens: projects, agents of a project

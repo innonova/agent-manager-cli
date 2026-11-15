@@ -63,6 +63,9 @@ export const USAGE = `am — terminal client for agent-manager
   am set <agent> [--name N] [--model M] [--effort E] [--ask|--bypass]
                               edit the agent; model, effort and permissions apply at its next restart
   am restart <agent>          stop and resume with the current settings; refused while busy
+  am compact <agent>          compact its context now: replaced by a summary of itself, with its dialog
+                              handed back word for word (weighed first if it has grown, which takes
+                              minutes; the agent's flow says how it goes); refused while it is in a turn
   am archive <agent>          end its session and take it off the list (transcript kept)
   am delete <agent>           forget it for good: process, daemon logs, cache; the vendor's store stays
   am method                   how work is run under this manager: features, the gate, helpers, reviews
@@ -382,6 +385,13 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
         await api.restart(agent.id)
         io.out('restarted')
+        return 0
+      }
+      case 'compact': {
+        const api = client()
+        const { agent } = await findAgent(api, need(rest[0], 'agent'))
+        await api.compact(agent.id)
+        io.out('compaction asked for; the flow says how it goes')
         return 0
       }
       case 'archive': {

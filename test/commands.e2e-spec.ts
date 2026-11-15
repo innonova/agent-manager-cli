@@ -338,6 +338,8 @@ describe('plain commands', () => {
       /an agent's own/,
     )
     expect((await am(['recall', '--agent', 'talker', '1'])).text).toContain('token please')
+    // compaction on request: refused in a turn (the agent is lingering), asked for once it is idle
+    expect((await am(['compact', 'talker'])).err[0]).toMatch(/is in a turn/)
     // a steer from the terminal goes into the turn; to an idle agent it is a turn
     expect((await am(['say', '--to', 'talker', '--steer', 'stop'])).text).toMatch(
       /^steered into talker's turn/,
@@ -346,6 +348,10 @@ describe('plain commands', () => {
     await until('idle')
     expect((await am(['say', '--to', 'talker', 'hello again'])).text).toMatch(
       /^sent to talker as a turn/,
+    )
+    await until('idle')
+    expect((await am(['compact', 'talker'])).text).toBe(
+      'compaction asked for; the flow says how it goes',
     )
     await until('idle')
     // stop, edit, go: the last message is taken back while the agent works on it, and printed
