@@ -213,6 +213,111 @@ describe('plain commands', () => {
     }
   })
 
+  it('chat: a person leaves a message beside the work, the agent reads it, says, decides and asks', async () => {
+    process.env.AGENT_MANAGER_PASSWORD = ADMIN_PASSWORD
+    expect((await am(['login', '--name', 'admin', '--url', backend.url])).code).toBe(0)
+    const api = new Api(backend.url)
+    await api.login('admin', ADMIN_PASSWORD)
+    const { agent } = await api.createAgent(projectId, { name: 'talker' })
+    await api.turn(agent.id, 'token please')
+    let token = ''
+    for (let i = 0; i < 100 && !token; i++) {
+      const { items } = await api.items(agent.id, { tail: 20 })
+      for (const it of items)
+        if (it.item.kind === 'text') token = /token ([0-9a-f]{64})/.exec(it.item.text)?.[1] ?? token
+      if (!token) await new Promise((r) => setTimeout(r, 100))
+    }
+    const state = async () => (await api.agent(agent.id)).status.state
+    const until = async (want: string) => {
+      for (let i = 0; i < 100 && (await state()) !== want; i++)
+        await new Promise((r) => setTimeout(r, 100))
+      expect(await state()).toBe(want)
+    }
+    await until('idle')
+    // a person, from a terminal: outside a session the agent has to be named
+    expect((await am(['say', 'hello'])).err[0]).toMatch(/name the agent/)
+    expect((await am(['chat'])).err[0]).toMatch(/name the agent/)
+    await api.turn(agent.id, 'linger')
+    await until('working')
+    const left = await am(['say', '--to', 'talker', 'the', 'header', 'is', 'misaligned'])
+    expect(left.code).toBe(0)
+    expect(left.text).toMatch(/^left for talker beside its work \(#\d+\): unread/)
+    // multi-line Markdown goes on stdin, untouched
+    expect((await am(['say', '--to', 'demo/talker'], [], 'and:\n\n- "one"\n- `two`\n')).code).toBe(
+      0,
+    )
+    const seen = await am(['chat', 'talker'])
+    expect(seen.text).toContain('the header is misaligned')
+    expect(seen.text).toContain('- "one"\n- `two`')
+    expect(seen.text.match(/unread/g)).toHaveLength(2) // a person looking marks nothing
+    expect((await am(['chat', 'talker'])).text.match(/unread/g)).toHaveLength(2)
+    expect((await am(['say', '--to', 'talker', '--decision', 'x'])).code).toBe(2)
+
+    // the agent, in its session: the token says who it is
+    process.env.AGENT_MANAGER_URL = backend.url
+    process.env.AGENT_MANAGER_TOKEN = token
+    try {
+      const back = await am(['chat', '--last', '2']) // reading back marks nothing
+      expect(back.text).toContain('the header is misaligned')
+      expect(back.out.at(-1)).toMatch(/^2 unread: `am chat` prints and marks them read$/)
+      const read = await am(['chat'])
+      expect(read.code).toBe(0)
+      expect(read.text).toMatch(/#\d+  admin  \d\d:\d\d\nthe header is misaligned\n/)
+      expect(read.text).toContain('and:\n\n- "one"\n- `two`')
+      expect(read.text).not.toContain('unread')
+      expect((await am(['chat'])).text).toBe('nothing unread')
+
+      const said = await am(['say', 'The store is in; starting on the hook.'])
+      expect(said.text).toMatch(/^said \(#\d+\)$/)
+      const decided = await am(['say', '--decision', '--important'], [], 'Kept it in SQLite.\n')
+      expect(decided.text).toMatch(/^decision said \(#\d+\), sent to their phones$/)
+      const asked = await am(['say', '--question', 'Blue or green?'])
+      expect(asked.text).toMatch(/^asked \(#\d+\): sent to their phones and pinned until answered/)
+      const q = /#(\d+)/.exec(asked.text)![1]!
+      expect((await am(['say', '--decision', '--question', 'x'])).code).toBe(2)
+      expect((await am(['say'], [], '  \n')).code).toBe(1)
+      const own = await am(['chat', '--last', '3'])
+      expect(own.text).toMatch(/#\d+  talker  \d\d:\d\d\nThe store is in/)
+      expect(own.text).toMatch(/#\d+  talker  important decision  \d\d:\d\d\nKept it in SQLite\./)
+      expect(own.text).toMatch(new RegExp(`#${q}  talker  question, open  `))
+
+      // the answer, from the person, while the agent works: announced as what it is
+      delete process.env.AGENT_MANAGER_URL
+      delete process.env.AGENT_MANAGER_TOKEN
+      expect((await am(['say', '--to', 'talker', '--re', q, 'Green.'])).code).toBe(0)
+      process.env.AGENT_MANAGER_URL = backend.url
+      process.env.AGENT_MANAGER_TOKEN = token
+      const answer = await am(['chat'])
+      expect(answer.text).toMatch(
+        new RegExp(`#\\d+  admin  \\d\\d:\\d\\d  answer to #${q} "Blue or green\\?"\nGreen\\.`),
+      )
+      expect((await am(['chat', '--last', '9'])).text).toMatch(
+        new RegExp(`#${q}  talker  question, answered  `),
+      )
+
+      // a question it no longer needs answered
+      const again = await am(['say', '--question', 'Tabs?'])
+      const q2 = /#(\d+)/.exec(again.text)![1]!
+      expect((await am(['chat'])).out.at(-1)).toBe('1 of your questions is still open')
+      expect((await am(['chat', 'close', q2])).text).toBe(`closed #${q2}`)
+      expect((await am(['chat', '--last', '1'])).text).toMatch(/question, closed/)
+      expect((await am(['chat', 'close', 'nope'])).code).toBe(1)
+    } finally {
+      delete process.env.AGENT_MANAGER_URL
+      delete process.env.AGENT_MANAGER_TOKEN
+    }
+    // a steer from the terminal goes into the turn; to an idle agent it is a turn
+    expect((await am(['say', '--to', 'talker', '--steer', 'stop'])).text).toMatch(
+      /^steered into talker's turn/,
+    )
+    await api.interrupt(agent.id)
+    await until('idle')
+    expect((await am(['say', '--to', 'talker', 'hello again'])).text).toMatch(
+      /^sent to talker as a turn/,
+    )
+    await until('idle')
+  })
+
   it('creates a project with several repos, adds one later and restarts its agents', async () => {
     process.env.AGENT_MANAGER_PASSWORD = ADMIN_PASSWORD
     expect((await am(['login', '--name', 'admin', '--url', backend.url])).code).toBe(0)

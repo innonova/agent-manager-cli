@@ -9,7 +9,7 @@ import { holdText, parseUntil } from './until.js'
 import { Events } from './events.js'
 import { agentFacts, bold, dim, renderItem, stateMark } from './render.js'
 import { answerTexts } from './quiet.js'
-import type { Agent, EventFrame, Item, StoredItem, TurnImage } from './types.js'
+import type { Agent, ChatMessage, EventFrame, Item, StoredItem, TurnImage } from './types.js'
 
 export interface Io {
   out: (line: string) => void
@@ -70,6 +70,21 @@ export const USAGE = `am — terminal client for agent-manager
   am runs [project]           the run log: feature, agent and model, duration, commits, cost, outcome
   am runs review <run-id> --outcome accepted|sent-back [--cause model|brief|doc] [--note TEXT]
                               close the loop on a run: a cause is required when sending back
+  am chat [<agent>] [--last N]   an agent's chat with the people, beside its work. Inside an agent's
+                              session with no agent named it is the agent reading: what is unread,
+                              marked read by being printed; --last N reads the last N back and
+                              marks nothing. With an agent named: its last messages (20, or N)
+  am chat close [<agent>] <id>   close an open question: the agent's own, no longer needed, or one
+                              a person dismisses
+  am say [--to <agent>] <text...>   say something in the chat; the text is read from stdin when none
+                              is given (am say <<'EOF' ... EOF). Inside an agent's session it is the
+                              agent speaking to the people: --decision for a choice made on their
+                              behalf, --question for one that stays pinned until answered and
+                              reaches their phones, --important for what should reach their phones.
+                              --to <agent> says it to that agent instead: beside its work while it
+                              is in a turn, for it to read when it chooses (--steer: into the turn
+                              now), and as a turn when it is idle. --re ID replies to a message;
+                              a reply to an open question is its answer
   am notes [<project>] [--all]   the project's notes: small actionable items, open ones with their ids
   am note add [<project>] <text...>   add one (the first line is the title)
   am note done|undo|drop [<project>] <id>   tick, reopen or remove one
@@ -447,6 +462,10 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         }
         return 0
       }
+      case 'chat':
+        return await chat(rest, io)
+      case 'say':
+        return await say(rest, io)
       case 'notes': {
         const { values, positionals } = parseArgs({
           args: rest,
@@ -888,6 +907,164 @@ async function turn(rest: string[], io: Io): Promise<number> {
  * that sends, does something else and collects later. With no turn under
  * way, the last turn's answer is printed straight from the transcript.
  */
+/** The agent this session is, by its token; null for a person's login. */
+async function self(api: Api): Promise<string | null> {
+  if (!api.bearer) return null
+  return (await api.me()).agent?.id ?? null
+}
+
+const clock = (at: number): string => {
+  const d = new Date(at)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return d.toDateString() === new Date().toDateString()
+    ? time
+    : `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`
+}
+
+/** One chat message: a line that says who, what kind and when, then the text as it was written. */
+function printChat(m: ChatMessage, io: Io, marks: boolean): void {
+  const kind =
+    m.kind === 'question'
+      ? `question, ${m.closedAt === null ? 'open' : m.closedBy === 'answer' ? 'answered' : 'closed'}`
+      : m.kind === 'decision'
+        ? m.important
+          ? 'important decision'
+          : 'decision'
+        : m.important
+          ? 'important'
+          : ''
+  const re = m.re
+    ? `${m.re.kind === 'question' && m.from === 'person' ? 'answer to' : 're'} #${m.re.id} "${m.re.excerpt}"`
+    : ''
+  const read = marks && m.from === 'person' ? (m.readAt ? `read ${clock(m.readAt)}` : 'unread') : ''
+  io.out(
+    [bold(`#${m.id}`), m.author, kind, dim(clock(m.at)), re, read && dim(read)]
+      .filter(Boolean)
+      .join('  '),
+  )
+  io.out(m.text)
+  io.out('')
+}
+
+/**
+ * An agent's chat. The agent itself, naming nobody, reads: the unread
+ * messages are printed and that marks them read, which the people see.
+ * `--last N` and anyone else's look read back and mark nothing.
+ */
+async function chat(rest: string[], io: Io): Promise<number> {
+  const api = client()
+  const me = await self(api)
+  if (rest[0] === 'close') {
+    const [a, b] = rest.slice(1)
+    const idText = b ?? a
+    const ref = b ? a : undefined
+    if (!idText || !/^\d+$/.test(idText.replace(/^#/, '')))
+      throw new Error('am chat close [<agent>] <id>: the id of an open question')
+    const agentId = ref ? (await findAgent(api, ref)).agent.id : me
+    if (!agentId)
+      throw new Error("am chat close <agent> <id>: outside an agent's session, name the agent")
+    const { message } = await api.chatClose(agentId, Number(idText.replace(/^#/, '')))
+    io.out(`closed #${message.id}`)
+    return 0
+  }
+  const { values, positionals } = parseArgs({
+    args: rest,
+    allowPositionals: true,
+    options: { last: { type: 'string' } },
+  })
+  const last = values.last === undefined ? null : Number(values.last)
+  if (last !== null && (!Number.isInteger(last) || last < 1))
+    throw new UsageError('--last takes a number of messages')
+  const agentId = positionals[0] ? (await findAgent(api, positionals[0])).agent.id : me
+  if (!agentId) throw new Error("am chat <agent>: outside an agent's session, name the agent")
+  if (agentId === me && last === null) {
+    const { messages, summary } = await api.chatRead(agentId)
+    if (messages.length === 0) io.out(dim('nothing unread'))
+    for (const m of messages) printChat(m, io, false)
+    if (summary.questions)
+      io.out(
+        dim(
+          `${summary.questions} of your questions ${summary.questions === 1 ? 'is' : 'are'} still open`,
+        ),
+      )
+    return 0
+  }
+  const { messages, summary } = await api.chat(agentId, last ?? 20)
+  if (messages.length === 0) io.out(dim('nothing in this chat yet'))
+  for (const m of messages) printChat(m, io, true)
+  if (agentId === me && summary.unread)
+    io.out(dim(`${summary.unread} unread: \`am chat\` prints and marks them read`))
+  return 0
+}
+
+/**
+ * Says something in a chat. Inside an agent's session, naming nobody,
+ * it is the agent speaking to the people; with `--to` it is the caller
+ * speaking to that agent, which reads it when it chooses.
+ */
+async function say(rest: string[], io: Io): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: rest,
+    allowPositionals: true,
+    options: {
+      to: { type: 'string' },
+      decision: { type: 'boolean' },
+      question: { type: 'boolean' },
+      important: { type: 'boolean' },
+      steer: { type: 'boolean' },
+      re: { type: 'string' },
+    },
+  })
+  const text = (positionals.length ? positionals.join(' ') : ((await io.stdin?.()) ?? '')).trim()
+  if (!text) throw new Error("am say <text...>, or the text on stdin (am say <<'EOF')")
+  let replyTo: number | undefined
+  if (values.re !== undefined) {
+    replyTo = Number(values.re.replace(/^#/, ''))
+    if (!Number.isInteger(replyTo)) throw new UsageError('--re takes a message id')
+  }
+  const api = client()
+  const me = await self(api)
+  const to = values.to ? (await findAgent(api, values.to)).agent : null
+  if (!to || to.id === me) {
+    if (!me)
+      throw new Error("am say --to <agent> <text...>: outside an agent's session, name the agent")
+    if (values.steer) throw new UsageError('--steer is for a message to another agent (--to)')
+    if (values.decision && values.question)
+      throw new UsageError('--decision or --question, not both')
+    const kind = values.question ? 'question' : values.decision ? 'decision' : 'message'
+    const { message } = await api.chatSay(me, {
+      text,
+      kind,
+      ...(values.important ? { important: true } : {}),
+      ...(replyTo !== undefined ? { replyTo } : {}),
+    })
+    io.out(
+      kind === 'question'
+        ? `asked (#${message.id}): sent to their phones and pinned until answered; the answer arrives in the chat`
+        : `${kind === 'decision' ? 'decision said' : 'said'} (#${message.id})${message.important ? ', sent to their phones' : ''}`,
+    )
+    return 0
+  }
+  if (values.decision || values.question || values.important)
+    throw new UsageError(
+      '--decision, --question and --important are for an agent speaking in its own chat',
+    )
+  const { message, mode } = await api.chatSay(to.id, {
+    text,
+    ...(values.steer ? { steer: true } : {}),
+    ...(replyTo !== undefined ? { replyTo } : {}),
+  })
+  io.out(
+    mode === 'turn'
+      ? `sent to ${to.name} as a turn (#${message.id})`
+      : mode === 'steer'
+        ? `steered into ${to.name}'s turn (#${message.id})`
+        : `left for ${to.name} beside its work (#${message.id}): unread until it reads its chat`,
+  )
+  return 0
+}
+
 /** A project named on the command line, else the one an agent's session carries (AGENT_MANAGER_PROJECT). */
 function projectRef(given: string | undefined): string {
   const ref = given ?? process.env.AGENT_MANAGER_PROJECT

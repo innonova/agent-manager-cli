@@ -2,6 +2,8 @@ import type {
   Agent,
   AgentRow,
   AgentStatus,
+  ChatMessage,
+  ChatSummary,
   Feature,
   Learning,
   Notes,
@@ -71,7 +73,9 @@ export class Api {
   login = (name: string, password: string) =>
     this.call<{ user: User }>('POST', '/api/auth/login', { name, password })
   logout = () => this.call<unknown>('POST', '/api/auth/logout', {})
-  me = () => this.call<{ user: User }>('GET', '/api/auth/me')
+  /** Who this is; `agent` when the credential is an agent's own session token. */
+  me = () =>
+    this.call<{ user: User; agent?: { id: string; projectId: string } }>('GET', '/api/auth/me')
   health = () => this.call<{ status: string; daemon: boolean }>('GET', '/api/health')
 
   projects = () =>
@@ -205,6 +209,38 @@ export class Api {
       durationMs: number
       timedOut: boolean
     }>('POST', `/api/hosts/${encodeURIComponent(host)}/exec`, { command, ...opts })
+  /** An agent's chat, oldest first: the last `limit` messages. */
+  chat = (id: string, limit = 20) =>
+    this.call<{ messages: ChatMessage[]; summary: ChatSummary }>(
+      'GET',
+      `/api/agents/${id}/chat?limit=${limit}`,
+    )
+  /** The agent itself fetching what is unread, which marks it read; refused (403) for anyone else. */
+  chatRead = (id: string) =>
+    this.call<{ messages: ChatMessage[]; summary: ChatSummary }>(
+      'POST',
+      `/api/agents/${id}/chat/read`,
+      {},
+    )
+  /** Says something in an agent's chat: as the agent with its own token, to the agent otherwise (`mode` says how it travelled). */
+  chatSay = (
+    id: string,
+    body: {
+      text: string
+      kind?: 'message' | 'decision' | 'question'
+      important?: boolean
+      replyTo?: number
+      steer?: boolean
+    },
+  ) =>
+    this.call<{ message: ChatMessage; mode?: 'aside' | 'turn' | 'steer' }>(
+      'POST',
+      `/api/agents/${id}/chat`,
+      body,
+    )
+  /** Closes an open question: the agent's own, or dismissed by a person. */
+  chatClose = (id: string, messageId: number) =>
+    this.call<{ message: ChatMessage }>('POST', `/api/agents/${id}/chat/${messageId}/close`, {})
   notes = (projectId: string) => this.call<Notes>('GET', `/api/projects/${projectId}/notes`)
   addNote = (projectId: string, text: string) =>
     this.call<Notes>('POST', `/api/projects/${projectId}/notes`, { text })

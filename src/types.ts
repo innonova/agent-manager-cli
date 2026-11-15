@@ -194,3 +194,30 @@ export interface Notes {
   items: NoteItem[]
   open: number
 }
+
+/** One message of an agent's chat with the people (see the manager's Chat section). */
+export interface ChatMessage {
+  id: number
+  agentId: string
+  from: 'agent' | 'person'
+  author: string
+  kind: 'message' | 'decision' | 'question'
+  important: boolean
+  text: string
+  /** The message this one replies to. */
+  re: { id: number; kind: string; excerpt: string } | null
+  /** How a person's message travelled: beside the work, as a turn, as a steer. */
+  via: 'aside' | 'turn' | 'steer' | null
+  images: number
+  at: number
+  /** A person's message: when the agent got it. */
+  readAt: number | null
+  /** A question: when it stopped being open, and how. */
+  closedAt: number | null
+  closedBy: 'answer' | 'person' | 'agent' | null
+}
+export interface ChatSummary {
+  unread: number
+  questions: number
+  last: number
+}
