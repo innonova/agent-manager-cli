@@ -49,7 +49,11 @@ listed as skipped), `agents <project>`,
 `tail <agent> [--lines N] [--follow] [--full]` (`--follow` streams,
 `--full` expands tool output and thinking), `turn <agent> <text>
 [--steer] [--no-wait]`, `allow <agent> [--option ID]` / `deny <agent>`,
-`interrupt`, `stop`, `restart <agent>` (stop and resume that one
+`interrupt` (stops the turn; the agent stays), `stop` (ends the
+session), `undo <agent>` (takes the last message back, stopping its
+turn, and prints it to be edited and sent again; a Claude agent forgets
+it and its reply, and what the reply did on disk stays),
+`restart <agent>` (stop and resume that one
 agent with the current settings, conversation intact; the manager
 refuses it while the agent is busy), `archive <agent>`, `delete
 <agent>` (forget it for good: process, daemon logs, cache and rows;

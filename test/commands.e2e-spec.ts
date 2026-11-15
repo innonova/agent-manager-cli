@@ -316,6 +316,14 @@ describe('plain commands', () => {
       /^sent to talker as a turn/,
     )
     await until('idle')
+    // stop, edit, go: the last message is taken back while the agent works on it, and printed
+    await api.turn(agent.id, 'linger on the wrnog thing')
+    await until('working')
+    const undone = await am(['undo', 'talker'])
+    expect(undone.code).toBe(0)
+    expect(undone.out[0]).toMatch(/^taken back: the agent still has the message \(fake keeps/)
+    expect(undone.out.at(-1)).toBe('linger on the wrnog thing')
+    await until('idle')
   })
 
   it('creates a project with several repos, adds one later and restarts its agents', async () => {

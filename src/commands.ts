@@ -54,10 +54,10 @@ export const USAGE = `am — terminal client for agent-manager
                               1d) or off; inside an agent's session the agent is itself
   am allow <agent> [--option ID]   answer the pending permission (first allow option by default)
   am deny <agent>             both print the rest of the turn unless --no-wait
-  am undo <agent>             take back the last message sent to a Claude agent: it will have no
-                              memory of it or of its reply; refused when the reply did more than read
-  am interrupt <agent>
-  am stop <agent>
+  am undo <agent>             take back the last message sent: its turn is stopped and the text printed,
+                              to edit and send again; a Claude agent forgets it and its reply (work on disk stays)
+  am interrupt <agent>        stop the turn under way; the agent stays and takes the next message
+  am stop <agent>             end the session (its process); the next message resumes it
   am set <agent> [--name N] [--model M] [--effort E] [--ask|--bypass]
                               edit the agent; model, effort and permissions apply at its next restart
   am restart <agent>          stop and resume with the current settings; refused while busy
@@ -260,10 +260,16 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       case 'undo': {
         const api = client()
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
-        const { withdrawn } = await api.undo(agent.id)
+        const { text, forgotten, left } = await api.undo(agent.id)
         io.out(
-          `withdrawn: the last message and its reply (${withdrawn} records of the conversation)`,
+          forgotten
+            ? 'taken back: the agent has no memory of the message or of its reply'
+            : `taken back: the agent still has the message (${agent.profile} keeps its conversation out of reach, or it was not found)`,
         )
+        if (left.length) io.out(`what the reply did stays: ${left.join(', ')}`)
+        // the message itself, last and plain: it is what gets edited and sent again
+        io.out('')
+        io.out(text)
         return 0
       }
       case 'interrupt': {
