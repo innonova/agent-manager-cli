@@ -1,6 +1,7 @@
 import wrapAnsi from 'wrap-ansi'
 import { describe, expect, it } from 'vitest'
-import { wrapText } from './render.js'
+import { agentFacts, wrapText } from './render.js'
+import type { Agent, AgentStatus } from './types.js'
 
 const wrap = (t: string, w: number) => wrapAnsi(t, w, { hard: true, trim: false })
 
@@ -101,5 +102,29 @@ describe('esc', async () => {
       '\x1b[31mstill red\x1b[0m',
       'plain',
     ])
+  })
+})
+
+describe('agentFacts', () => {
+  const agent = {
+    profile: 'claude',
+    model: 'claude-fable-5-2',
+    effort: null,
+    permissions: 'bypass',
+    cwd: '/w',
+  } as Agent
+  const status = (usage: AgentStatus['usage']) =>
+    ({ model: 'claude-fable-5-2', usage }) as AgentStatus
+  it('says the context window after the model, once the manager knows it', () => {
+    expect(agentFacts(agent, status(null))).toBe('claude · claude-fable-5-2 · /w')
+    expect(
+      agentFacts(agent, status({ windows: [], context: { used: 158_331, size: 200_000 }, at: 0 })),
+    ).toBe('claude · claude-fable-5-2 · ctx 79% of 200k · /w')
+    expect(
+      agentFacts(
+        agent,
+        status({ windows: [], context: { used: 158_331, size: 1_000_000 }, at: 0 }),
+      ),
+    ).toBe('claude · claude-fable-5-2 · ctx 16% of 1M · /w')
   })
 })

@@ -104,7 +104,11 @@ permission or whose event stream is lost exits 0 after saying so.
 `am` with no arguments. Three screens: projects, agents of a project
 (each row with everything the agent was created with: profile, model,
 effort, "asks" in ask mode, working directory, since there is no
-editing; `am agents` prints the same), and the chat, whose first line
+editing, and after the model the context window the session got and
+how full it is, "ctx 16% of 1M", when the manager knows it: a Claude
+model name asks for the 1M window with `[1m]` at its end and gets the
+model's default without, which nothing else shows; `am agents` prints
+the same), and the chat, whose first line
 repeats those facts; `Esc` goes back, `q` quits from the pickers, `Ctrl+C`
 always. Lists take arrows or `j`/`k`, `PageUp`/`PageDown`, `Enter`. The chat screen:
 

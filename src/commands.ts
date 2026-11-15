@@ -34,6 +34,8 @@ export const USAGE = `am — terminal client for agent-manager
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
                               [--host H]: run the agent's session on that machine (a spoke), with
                               --cwd an absolute path there; the project stays here
+                              a Claude model name ending in [1m] asks for the 1M context window
+                              (claude-fable-5-2[1m]); \`am agents\` shows the window each agent got
   am tail <agent> [--lines N] [--follow] [--full]
   am turn <agent> <text...>   send a turn and print it as it runs (--no-wait: just send;
                               --quiet: print the agent's answer (its texts, minus the

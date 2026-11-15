@@ -259,10 +259,19 @@ export function wrapText(
 }
 
 /** Profile, model, effort, permission mode and working directory as one dotted line. */
+/** A context window's size as people say it: 1M, 200k. */
+const windowSize = (n: number): string =>
+  n >= 1e6 && n % 1e5 === 0 ? `${n / 1e6}M` : `${Math.round(n / 1e3)}k`
+
 export function agentFacts(agent: Agent, status: AgentStatus): string {
+  const ctx = status.usage?.context
   return [
     agent.profile,
     status.model ?? agent.model ?? '',
+    // which window the agent got and how full it is: not seen in a model name without `[1m]`
+    ctx
+      ? `ctx ${Math.round((100 * ctx.used) / Math.max(1, ctx.size))}% of ${windowSize(ctx.size)}`
+      : '',
     agent.effort ? `effort ${agent.effort}` : '',
     agent.permissions === 'ask' ? 'asks' : '',
     agent.cwd,
