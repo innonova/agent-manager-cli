@@ -83,6 +83,8 @@ export const USAGE = `am — terminal client for agent-manager
                               what would be handed back if the context were compacted now: which
                               exchanges whole, how many as lines, the tokens; --full prints the
                               text itself. Nothing is written or sent
+  am recall --handback --now  inside an agent's session: hand the dialog back to yourself now, without
+                              waiting for a compaction. Prints which files to read
   am recall --weigh [--model M] [--agent A]
                               weigh the dialog now (minutes, and the manager's tokens): what is
                               handed back after a compaction is chosen by these weights
@@ -989,6 +991,7 @@ async function recall(rest: string[], io: Io): Promise<number> {
       model: { type: 'string' },
       handback: { type: 'boolean' },
       full: { type: 'boolean' },
+      now: { type: 'boolean' },
     },
   })
   const api = client()
@@ -1012,6 +1015,15 @@ async function recall(rest: string[], io: Io): Promise<number> {
       )
       return 0
     }
+  }
+  if (values.handback && values.now) {
+    if (values.agent || !(await self(api)))
+      throw new Error(
+        "am recall --handback --now is an agent's own: it hands the dialog to the session that asks",
+      )
+    const { text } = await api.handbackNow()
+    io.out(text ?? 'no dialog yet')
+    return 0
   }
   if (values.handback) {
     const h = await api.handbackPreview(agentId)

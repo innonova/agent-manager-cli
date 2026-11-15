@@ -109,7 +109,9 @@ exchanges word for word, the person's side and the agent's, nothing
 shortened: it is the record of what was settled, and an agent fetches
 from it what was not handed back. `--handback` says what a hand-back
 would hold at this moment (`--full`: the text), which is how a person
-checks the selection; `--weigh` runs the classifier now, `--model M`
+checks the selection; with `--now`, inside an agent's session, it is
+the agent handing the dialog to itself without waiting for a
+compaction, and prints the notice that names the files to read; `--weigh` runs the classifier now, `--model M`
 with another model, which is how one is tried. Inside an agent's
 session the agent is itself; elsewhere `--agent` names it.
 

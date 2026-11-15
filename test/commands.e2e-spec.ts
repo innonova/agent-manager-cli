@@ -317,6 +317,9 @@ describe('plain commands', () => {
       expect((await am(['recall', '999'])).err[0]).toMatch(/no exchange #999/)
       expect((await am(['recall', 'x'])).code).toBe(2)
       expect((await am(['recall', '--weigh'])).err[0]).toMatch(/no classifier is configured/)
+      const now = await am(['recall', '--handback', '--now'])
+      expect(now.text).toMatch(/asked for now, without a compaction/)
+      expect(now.text).toMatch(/\/handback\/[0-9a-f-]+\/dialog-1\.md/)
       const would = await am(['recall', '--handback'])
       expect(would.out[0]).toMatch(/^recent, whole: #1 #2/)
       expect(would.out[1]).toBe('earlier, whole: none')
@@ -331,6 +334,9 @@ describe('plain commands', () => {
       delete process.env.AGENT_MANAGER_TOKEN
     }
     expect((await am(['recall'])).err[0]).toMatch(/name the agent/)
+    expect((await am(['recall', '--handback', '--now', '--agent', 'talker'])).err[0]).toMatch(
+      /an agent's own/,
+    )
     expect((await am(['recall', '--agent', 'talker', '1'])).text).toContain('token please')
     // a steer from the terminal goes into the turn; to an idle agent it is a turn
     expect((await am(['say', '--to', 'talker', '--steer', 'stop'])).text).toMatch(

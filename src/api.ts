@@ -239,6 +239,9 @@ export class Api {
       budget: number
       files: string[]
     }>('GET', `/api/agents/${id}/dialog/handback`)
+  /** The agent's own dialog handed back now, in the middle of a window: the files are written and the notice naming them returned. An agent's token only. */
+  handbackNow = () =>
+    this.call<{ text: string | null }>('POST', '/api/dialog/handback', { on: 'request' })
   /** Starts a weighing of the dialog, with the manager's classifier or another model in its place; `dialog` says when it is done. */
   weigh = (id: string, model?: string) =>
     this.call<{ weighing: { since: number; model: string } }>(
