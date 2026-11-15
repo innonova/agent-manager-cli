@@ -222,6 +222,8 @@ export class Api {
     this.call<{
       exchanges: ExchangeLine[]
       weighed: { at: number; model: string; upTo: number } | null
+      weighing: { since: number; model: string } | null
+      failed: { at: number; message: string } | null
       classifier: string | null
     }>('GET', `/api/agents/${id}/dialog`)
   /** One exchange, word for word. */
@@ -237,9 +239,9 @@ export class Api {
       budget: number
       files: string[]
     }>('GET', `/api/agents/${id}/dialog/handback`)
-  /** Weighs the dialog now, with the manager's classifier or another model in its place; takes minutes. */
+  /** Starts a weighing of the dialog, with the manager's classifier or another model in its place; `dialog` says when it is done. */
   weigh = (id: string, model?: string) =>
-    this.call<{ weighed: number; of: number; ms: number; model: string }>(
+    this.call<{ weighing: { since: number; model: string } }>(
       'POST',
       `/api/agents/${id}/dialog/weigh`,
       model ? { model } : {},

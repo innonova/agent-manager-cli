@@ -971,6 +971,9 @@ function printChat(m: ChatMessage, io: Io, marks: boolean): void {
   io.out('')
 }
 
+/** How often a weighing under way is asked about. */
+const WEIGH_POLL_MS = Number(process.env.AM_WEIGH_POLL_MS) || 3000
+
 /**
  * An agent's dialog with its people: the list, exchanges by number, or
  * a weighing. What it prints of an exchange is what was written, both
@@ -993,13 +996,22 @@ async function recall(rest: string[], io: Io): Promise<number> {
   if (!agentId)
     throw new Error("am recall --agent <agent>: outside an agent's session, name the agent")
   if (values.weigh) {
-    const r = await api.weigh(agentId, values.model)
-    io.out(
-      r.weighed
-        ? `weighed ${r.weighed} of ${r.of} exchanges with ${r.model} in ${Math.round(r.ms / 1000)} s`
-        : `nothing to weigh (${r.of} exchanges)`,
-    )
-    return 0
+    // started there and asked about from here: a weighing takes minutes, longer than a request is held
+    const { weighing } = await api.weigh(agentId, values.model)
+    io.err(dim(`weighing with ${weighing.model}; this takes minutes`))
+    for (;;) {
+      await new Promise((r) => setTimeout(r, WEIGH_POLL_MS))
+      const d = await api.dialog(agentId)
+      if (d.weighing) continue
+      if (d.failed && d.failed.at >= weighing.since)
+        throw new Error(`the weighing failed: ${d.failed.message}`)
+      const live = d.exchanges.filter((e) => !e.withdrawn)
+      const done = live.filter((e) => e.weight !== null).length
+      io.out(
+        `weighed ${done} of ${live.length} exchanges with ${d.weighed?.model ?? weighing.model} in ${Math.round((Date.now() - weighing.since) / 1000)} s`,
+      )
+      return 0
+    }
   }
   if (values.handback) {
     const h = await api.handbackPreview(agentId)
