@@ -99,6 +99,20 @@ turn that ended in an error, and for `tail --follow` losing its login;
 2 for usage, and for `am` without a terminal. A turn that stops for a
 permission or whose event stream is lost exits 0 after saying so.
 
+`am recall` is an agent's dialog with its people, which the manager
+keeps outside the agent's context and hands back after a compaction
+(agent-manager's design, "The dialog after a compaction"). With no
+argument it lists every exchange in one line: number, date, the weight
+the classifier gave it (`-` until weighed), its kind, and what it
+settled. With numbers or ranges (`12`, `12-15`) it prints those
+exchanges word for word, the person's side and the agent's, nothing
+shortened: it is the record of what was settled, and an agent fetches
+from it what was not handed back. `--handback` says what a hand-back
+would hold at this moment (`--full`: the text), which is how a person
+checks the selection; `--weigh` runs the classifier now, `--model M`
+with another model, which is how one is tried. Inside an agent's
+session the agent is itself; elsewhere `--agent` names it.
+
 ## TUI
 
 `am` with no arguments. Three screens: projects, agents of a project

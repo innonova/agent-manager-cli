@@ -35,6 +35,7 @@ export async function startBackend(): Promise<Backend> {
   fs.writeFileSync(path.join(projectDir, 'README.md'), '# demo\n')
   const env = { ...process.env }
   delete env.ELECTRON_RUN_AS_NODE
+  env.AGENT_MANAGER_DIALOG_CLASSIFIER = 'off' // no model call on the developer's account
   const procs: ChildProcess[] = []
   const waitFor = (proc: ChildProcess, re: RegExp, what: string) =>
     new Promise<string>((resolve, reject) => {

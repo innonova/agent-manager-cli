@@ -221,3 +221,27 @@ export interface ChatSummary {
   questions: number
   last: number
 }
+
+/** One exchange of an agent's dialog as a list shows it. */
+export interface ExchangeLine {
+  n: number
+  at: number
+  by: string
+  tokens: number
+  /** What it settled or asked, in the classifier's words; the first words of the message until weighed. */
+  line: string
+  kind: 'purpose' | 'rule' | 'decision' | 'task' | 'chatter' | null
+  weight: number | null
+  inForce: boolean | null
+  supersededBy: number | null
+  withdrawn: boolean
+}
+/** One exchange, word for word: what the person wrote, and what the agent wrote back. */
+export interface Exchange {
+  n: number
+  at: number
+  by: string
+  person: string
+  agent: string
+  withdrawn: boolean
+}

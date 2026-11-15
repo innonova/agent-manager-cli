@@ -72,6 +72,20 @@ export const USAGE = `am — terminal client for agent-manager
   am runs [project]           the run log: feature, agent and model, duration, commits, cost, outcome
   am runs review <run-id> --outcome accepted|sent-back [--cause model|brief|doc] [--note TEXT]
                               close the loop on a run: a cause is required when sending back
+  am recall [<n> | <n>-<m>]... [--agent A]
+                              the agent's dialog with its people, word for word, by exchange number:
+                              what the person wrote and what the agent wrote back. With no number,
+                              the list: every exchange in one line, with the weight it was given.
+                              After a compaction the manager hands the recent and the weightiest
+                              back by itself; this fetches any other. Inside an agent's session the
+                              agent is itself
+  am recall --handback [--full] [--agent A]
+                              what would be handed back if the context were compacted now: which
+                              exchanges whole, how many as lines, the tokens; --full prints the
+                              text itself. Nothing is written or sent
+  am recall --weigh [--model M] [--agent A]
+                              weigh the dialog now (minutes, and the manager's tokens): what is
+                              handed back after a compaction is chosen by these weights
   am chat [<agent>] [--last N]   an agent's chat with the people, beside its work. Inside an agent's
                               session with no agent named it is the agent reading: what is unread,
                               marked read by being printed; --last N reads the last N back and
@@ -470,6 +484,8 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         }
         return 0
       }
+      case 'recall':
+        return await recall(rest, io)
       case 'chat':
         return await chat(rest, io)
       case 'say':
@@ -953,6 +969,114 @@ function printChat(m: ChatMessage, io: Io, marks: boolean): void {
   )
   io.out(m.text)
   io.out('')
+}
+
+/**
+ * An agent's dialog with its people: the list, exchanges by number, or
+ * a weighing. What it prints of an exchange is what was written, both
+ * sides, nothing shortened: it is the record of what was settled.
+ */
+async function recall(rest: string[], io: Io): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: rest,
+    allowPositionals: true,
+    options: {
+      agent: { type: 'string' },
+      weigh: { type: 'boolean' },
+      model: { type: 'string' },
+      handback: { type: 'boolean' },
+      full: { type: 'boolean' },
+    },
+  })
+  const api = client()
+  const agentId = values.agent ? (await findAgent(api, values.agent)).agent.id : await self(api)
+  if (!agentId)
+    throw new Error("am recall --agent <agent>: outside an agent's session, name the agent")
+  if (values.weigh) {
+    const r = await api.weigh(agentId, values.model)
+    io.out(
+      r.weighed
+        ? `weighed ${r.weighed} of ${r.of} exchanges with ${r.model} in ${Math.round(r.ms / 1000)} s`
+        : `nothing to weigh (${r.of} exchanges)`,
+    )
+    return 0
+  }
+  if (values.handback) {
+    const h = await api.handbackPreview(agentId)
+    if (values.full) for (const f of h.files) io.out(f)
+    const list = (ns: number[]) => (ns.length ? ns.map((n) => `#${n}`).join(' ') : 'none')
+    io.out(`recent, whole: ${list(h.recent)}`)
+    io.out(`earlier, whole: ${list(h.kept)}`)
+    io.out(
+      `${h.indexed} more as one line each; about ${h.tokens.toLocaleString('en-US')} tokens of a budget of ${h.budget.toLocaleString('en-US')}, in ${h.files.length} file${h.files.length === 1 ? '' : 's'}`,
+    )
+    return 0
+  }
+  const wanted: number[] = []
+  for (const p of positionals) {
+    const m = /^#?(\d+)(?:-#?(\d+))?$/.exec(p)
+    if (!m) throw new UsageError(`"${p}" is not an exchange number or a range (12, 12-15)`)
+    const from = Number(m[1])
+    const to = m[2] ? Number(m[2]) : from
+    if (to < from || to - from > 200)
+      throw new UsageError(`"${p}": a range runs upward, 200 at most`)
+    for (let n = from; n <= to; n++) wanted.push(n)
+  }
+  const day = (at: number) => new Date(at).toISOString().slice(0, 10)
+  if (wanted.length === 0) {
+    const { exchanges, weighed, classifier } = await api.dialog(agentId)
+    if (exchanges.length === 0) io.out(dim('no dialog yet'))
+    for (const e of exchanges) {
+      const state = e.withdrawn
+        ? 'taken back'
+        : e.supersededBy !== null
+          ? `reversed by #${e.supersededBy}`
+          : e.weight === null
+            ? ''
+            : e.inForce
+              ? ''
+              : e.kind === 'task'
+                ? 'done'
+                : e.kind === 'chatter'
+                  ? ''
+                  : 'no longer in force'
+      io.out(
+        [
+          bold(`#${e.n}`),
+          dim(day(e.at)),
+          e.weight === null ? dim('-') : String(e.weight),
+          e.kind ?? '',
+          e.line,
+          state && dim(`(${state})`),
+        ]
+          .filter(Boolean)
+          .join('  '),
+      )
+    }
+    io.out(
+      dim(
+        weighed
+          ? `weighed up to #${weighed.upTo} by ${weighed.model}, ${day(weighed.at)}; 3: needed word for word, 0: nothing to keep`
+          : classifier
+            ? `not weighed yet (\`am recall --weigh\` does it now, with ${classifier})`
+            : 'this manager weighs no dialog: only the recent exchanges are handed back',
+      ),
+    )
+    return 0
+  }
+  for (const n of wanted) {
+    const { exchange: e } = await api.exchange(agentId, n)
+    io.out(
+      `${bold(`#${e.n}`)}  ${dim(new Date(e.at).toISOString().slice(0, 16).replace('T', ' ') + ' UTC')}`,
+    )
+    io.out(`${e.by}:`)
+    io.out(e.person)
+    io.out('')
+    io.out('agent:')
+    io.out(e.agent || dim('(nothing written back before the next message)'))
+    io.out('')
+  }
+  return 0
 }
 
 /**

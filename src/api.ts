@@ -13,6 +13,8 @@ import type {
   StoredItem,
   TurnImage,
   User,
+  Exchange,
+  ExchangeLine,
 } from './types.js'
 
 export class ApiError extends Error {
@@ -215,6 +217,33 @@ export class Api {
       durationMs: number
       timedOut: boolean
     }>('POST', `/api/hosts/${encodeURIComponent(host)}/exec`, { command, ...opts })
+  /** An agent's dialog with its people, one line per exchange, with the weight each was given once weighed. */
+  dialog = (id: string) =>
+    this.call<{
+      exchanges: ExchangeLine[]
+      weighed: { at: number; model: string; upTo: number } | null
+      classifier: string | null
+    }>('GET', `/api/agents/${id}/dialog`)
+  /** One exchange, word for word. */
+  exchange = (id: string, n: number) =>
+    this.call<{ exchange: Exchange }>('GET', `/api/agents/${id}/dialog/${n}`)
+  /** What a hand-back would hold if the agent's context were compacted now; nothing is written or sent. */
+  handbackPreview = (id: string) =>
+    this.call<{
+      recent: number[]
+      kept: number[]
+      indexed: number
+      tokens: number
+      budget: number
+      files: string[]
+    }>('GET', `/api/agents/${id}/dialog/handback`)
+  /** Weighs the dialog now, with the manager's classifier or another model in its place; takes minutes. */
+  weigh = (id: string, model?: string) =>
+    this.call<{ weighed: number; of: number; ms: number; model: string }>(
+      'POST',
+      `/api/agents/${id}/dialog/weigh`,
+      model ? { model } : {},
+    )
   /** An agent's chat, oldest first: the last `limit` messages. */
   chat = (id: string, limit = 20) =>
     this.call<{ messages: ChatMessage[]; summary: ChatSummary }>(
