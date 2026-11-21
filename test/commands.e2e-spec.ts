@@ -341,7 +341,7 @@ describe('plain commands', () => {
     // how the agent has been run, in rows a terminal can show
     const stats = await am(['stats', 'talker'])
     expect(stats.out[0]).toMatch(/runtime +\d+ (s|min) in \d+ turns, since /)
-    expect(stats.text).toMatch(/since admin's last message +\d+ s of work/)
+    expect(stats.text).toMatch(/since admin's last direct message +\d+ s of work/)
     expect(stats.text).toMatch(/unattended +none/)
     // compaction on request: refused in a turn (the agent is lingering), asked for once it is idle
     expect((await am(['compact', 'talker'])).err[0]).toMatch(/is in a turn/)

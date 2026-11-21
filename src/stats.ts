@@ -65,7 +65,7 @@ export function statRows(s: AgentStats): { label: string; text: string; note?: s
   const m = s.sinceLastMessage
   if (m)
     rows.push({
-      label: `since ${m.by}'s last message`,
+      label: `since ${m.by}'s last direct message`,
       text: `${span(m.runtimeMs)} of work${m.turns > 1 ? ` in ${m.turns} turns` : ''}, ${count(m.outputTokens)} tokens out${s.working ? ' in the turns that have ended' : ''}; written ${moment(m.at)}`,
     })
   if (s.runs.count)
@@ -75,7 +75,7 @@ export function statRows(s: AgentStats): { label: string; text: string; note?: s
         .slice(0, 3)
         .map((r) => `${span(r.runtimeMs)} (${day(r.at)})`)
         .join(', ')}`,
-      note: 'a run is the work between one message from a person and the next',
+      note: 'a run is the work between one direct message from a person and the next; what is said in the chat ends no run',
     })
   const u = s.unattended
   rows.push({
@@ -83,7 +83,7 @@ export function statRows(s: AgentStats): { label: string; text: string; note?: s
     text: u.runtimeMs
       ? `${span(u.runtimeMs)}, ${Math.round(u.share * 100)}% of the runtime${u.runs ? `; ${u.runs.toLocaleString('en-US')} runs went on unattended, median ${span(u.medianMs)}, longest ${span(u.longestMs)}` : ''}`
       : 'none',
-    note: `work done more than ${span(u.afterMs)} after a person last wrote: by then they have most likely turned to something else`,
+    note: `work done more than ${span(u.afterMs)} after a person last wrote anything, in the flow or the chat: by then they have most likely turned to something else`,
   })
   return rows
 }
