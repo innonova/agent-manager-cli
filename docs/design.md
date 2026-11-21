@@ -115,6 +115,10 @@ compaction, and prints the notice that names the files to read; `--weigh` runs t
 with another model, which is how one is tried. Inside an agent's
 session the agent is itself; elsewhere `--agent` names it.
 
+`am stats [<agent>]` prints how an agent has been run, the rows the
+UI's statistics dialog shows, each with its definition under it
+(`src/stats.ts`, a copy of the UI's wording).
+
 `am compact <agent>` asks the manager to compact an agent's context
 now: the dialog is weighed first when it has grown since the last
 time, then the vendor's own compaction is sent as a turn. It is the

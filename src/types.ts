@@ -245,3 +245,35 @@ export interface Exchange {
   agent: string
   withdrawn: boolean
 }
+
+/** How an agent has been run, read off its transcript; see agent-manager's design, "Statistics". */
+export interface AgentStats {
+  since: number | null
+  turns: number
+  runtimeMs: number
+  tokens: { input: number; cacheWrite: number; cacheRead: number; output: number }
+  costUsd: number
+  working: boolean
+  startedBy: Record<'person' | 'agent' | 'manager' | 'self', { turns: number; runtimeMs: number }>
+  sinceLastMessage: {
+    at: number
+    by: string
+    runtimeMs: number
+    turns: number
+    outputTokens: number
+  } | null
+  runs: {
+    count: number
+    medianMs: number
+    longestMs: number
+    longest: { at: number; by: string; runtimeMs: number }[]
+  }
+  unattended: {
+    afterMs: number
+    runtimeMs: number
+    share: number
+    runs: number
+    longestMs: number
+    medianMs: number
+  }
+}

@@ -9,6 +9,7 @@ import { holdText, parseUntil } from './until.js'
 import { Events } from './events.js'
 import { agentFacts, bold, dim, renderItem, stateMark } from './render.js'
 import { answerTexts } from './quiet.js'
+import { statRows } from './stats.js'
 import type { Agent, ChatMessage, EventFrame, Item, StoredItem, TurnImage } from './types.js'
 
 export interface Io {
@@ -63,6 +64,10 @@ export const USAGE = `am — terminal client for agent-manager
   am set <agent> [--name N] [--model M] [--effort E] [--ask|--bypass]
                               edit the agent; model, effort and permissions apply at its next restart
   am restart <agent>          stop and resume with the current settings; refused while busy
+  am stats [<agent>]          how the agent has been run: runtime and turns, tokens and cost, who started
+                              the turns, the work since a person last wrote, the runs between
+                              messages, and how much went on unattended. Inside an agent's session
+                              the agent is itself
   am compact <agent>          compact its context now: replaced by a summary of itself, with its dialog
                               handed back word for word (weighed first if it has grown, which takes
                               minutes; the agent's flow says how it goes); refused while it is in a turn
@@ -385,6 +390,19 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
         await api.restart(agent.id)
         io.out('restarted')
+        return 0
+      }
+      case 'stats': {
+        const api = client()
+        const agentId = rest[0] ? (await findAgent(api, rest[0])).agent.id : await self(api)
+        if (!agentId)
+          throw new Error("am stats <agent>: outside an agent's session, name the agent")
+        const rows = statRows(await api.stats(agentId))
+        const width = Math.max(...rows.map((r) => r.label.length))
+        for (const r of rows) {
+          io.out(`${bold(r.label.padEnd(width))}  ${r.text}`)
+          if (r.note) io.out(`${' '.repeat(width)}  ${dim(r.note)}`)
+        }
         return 0
       }
       case 'compact': {
