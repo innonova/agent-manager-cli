@@ -66,7 +66,7 @@ export function statRows(s: AgentStats): { label: string; text: string; note?: s
   if (m)
     rows.push({
       label: `since ${m.by}'s last message`,
-      text: `${span(m.runtimeMs)} of work${m.turns > 1 ? ` in ${m.turns} turns` : ''}, ${count(m.outputTokens)} tokens out; written ${moment(m.at)}`,
+      text: `${span(m.runtimeMs)} of work${m.turns > 1 ? ` in ${m.turns} turns` : ''}, ${count(m.outputTokens)} tokens out${s.working ? ' in the turns that have ended' : ''}; written ${moment(m.at)}`,
     })
   if (s.runs.count)
     rows.push({
