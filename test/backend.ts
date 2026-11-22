@@ -89,6 +89,8 @@ export async function startBackend(): Promise<Backend> {
       AGENT_MANAGER_METHOD_FILE: path.join(root, 'method.md'),
       AGENT_MANAGER_FRAMING_FILE: path.join(root, 'framing.md'),
       AGENT_MANAGER_WORKSPACES_DIR: path.join(root, 'workspaces'), // nor a workspace file beside a real repository
+      AGENT_MANAGER_STREAMS_DIR: path.join(root, 'streams'), // nor a stream's home or the store in ~/streams
+      AGENT_MANAGER_STORE_COMMIT_MS: '200',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

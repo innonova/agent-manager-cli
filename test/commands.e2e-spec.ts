@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -426,4 +427,91 @@ describe('plain commands', () => {
     // set with nothing to change is a usage error too
     expect((await am(['project', 'set', 'guarded'])).code).toBe(2)
   })
+
+  it('starts a stream, registers a repository and clones it into the stream’s home', async () => {
+    process.env.AGENT_MANAGER_PASSWORD = ADMIN_PASSWORD
+    expect((await am(['login', '--name', 'admin', '--url', backend.url])).code).toBe(0)
+    const home = path.join(backend.root, 'streams', 'spring-clean')
+    // the purpose on stdin; a name that cannot be a directory and a branch prefix is refused
+    expect((await am(['stream', 'new', 'Spring Clean'])).code).toBe(1)
+    const made = await am(
+      ['stream', 'new', 'spring-clean', '--profile', 'fake'],
+      [],
+      'Empty the attic.\n',
+    )
+    expect([made.code, made.err]).toEqual([0, []])
+    expect(made.text).toContain(`home    ${home}`)
+    expect(fs.readFileSync(path.join(home, 'AGENTS.md'), 'utf8')).toContain('Empty the attic.')
+    const listed = await am(['projects'])
+    expect(listed.text).toMatch(new RegExp(`spring-clean .*stream · ${home}`))
+    expect((await am(['stream'])).code).toBe(2)
+
+    // a repository with a file git does not hold
+    const source = fs.mkdtempSync(path.join(os.tmpdir(), 'am-cli-source-'))
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args], {
+        cwd: source,
+      })
+    git('init', '-q', '-b', 'main')
+    fs.writeFileSync(path.join(source, '.gitignore'), '.env\n.ready\n')
+    git('add', '-A')
+    git('commit', '-qm', 'attic')
+    fs.writeFileSync(path.join(source, '.env'), 'KEY=1\n')
+
+    expect((await am(['repos'])).text).toContain('no repositories registered')
+    const added = await am(['repo', 'add', 'attic', source, '--setup', 'cp .env .ready'])
+    expect(added.code).toBe(0)
+    expect(added.text).toContain(`attic  ${source}`)
+    expect(added.text).toContain('setup  cp .env .ready')
+    expect((await am(['repo', 'seed', 'attic', '--from', source])).code).toBe(2)
+    expect((await am(['repo', 'seed', 'attic', '--from', source, '.env'])).text).toContain(
+      'seed   .env',
+    )
+
+    expect((await am(['clones', 'spring-clean'])).text).toContain('no clones in')
+    expect((await am(['use', 'nope', '--stream', 'spring-clean'])).code).toBe(1)
+    expect((await am(['use', 'attic', '--stream', 'demo'])).code).toBe(1) // a project has no home to clone into
+    const used = await am(['use', 'attic', '--stream', 'spring-clean'])
+    expect([used.code, used.err]).toEqual([0, []])
+    expect(used.text).toContain(`attic  ${path.join(home, 'attic')}  on main`)
+    expect(fs.readFileSync(path.join(home, 'attic', '.ready'), 'utf8')).toBe('KEY=1\n')
+    expect((await am(['clones', 'spring-clean'])).text).toContain(
+      `attic  ${path.join(home, 'attic')}  on main`,
+    )
+    expect((await am(['repos'])).text).toContain('used by  spring-clean')
+    expect((await am(['use', 'attic', '--stream', 'spring-clean'])).code).toBe(1) // one clone per stream
+
+    // an agent of the stream starts in the home, and inside its session the stream is implied
+    const api = new Api(backend.url)
+    await api.login('admin', ADMIN_PASSWORD)
+    const stream = (await api.projects()).find((p) => p.project.name === 'spring-clean')!.project
+    const { agent } = await api.createAgent(stream.id, { name: 'sorter' })
+    expect(agent.cwd).toBe(home)
+    await api.turn(agent.id, 'token please')
+    let token = ''
+    for (let i = 0; i < 100 && !token; i++) {
+      const { items } = await api.items(agent.id, { tail: 20 })
+      for (const it of items)
+        if (it.item.kind === 'text') token = /token ([0-9a-f]{64})/.exec(it.item.text)?.[1] ?? token
+      if (!token) await new Promise((r) => setTimeout(r, 100))
+    }
+    process.env.AGENT_MANAGER_URL = backend.url
+    process.env.AGENT_MANAGER_TOKEN = token
+    process.env.AGENT_MANAGER_PROJECT = 'spring-clean'
+    try {
+      expect((await am(['clones'])).text).toContain('attic')
+      expect((await am(['repo', 'add', 'cellar', source])).code).toBe(0)
+      const own = await am(['use', 'cellar'])
+      expect([own.code, own.err]).toEqual([0, []])
+      expect(fs.existsSync(path.join(home, 'cellar', '.git'))).toBe(true)
+      expect((await am(['stream', 'new', 'another'])).code).toBe(1) // starting a stream is a person's
+      expect((await am(['repo', 'drop', 'cellar'])).code).toBe(1) // and so is dropping a repository
+    } finally {
+      delete process.env.AGENT_MANAGER_URL
+      delete process.env.AGENT_MANAGER_TOKEN
+      delete process.env.AGENT_MANAGER_PROJECT
+    }
+    expect((await am(['repo', 'drop', 'cellar'])).text).toContain('dropped')
+    expect(fs.existsSync(path.join(home, 'cellar', '.git'))).toBe(true) // the clone stays
+  }, 60000)
 })

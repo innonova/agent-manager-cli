@@ -6,6 +6,26 @@ export interface User {
 export interface Repo {
   name: string
   path: string
+  /** A stream's own folder in the store, standing where a repository stands. */
+  folder?: true
+}
+/** A repository a stream can clone, as the manager's registry has it. */
+export interface Repository {
+  name: string
+  source: string
+  setup: string | null
+  /** The untracked files copied into a fresh clone. */
+  seed: string[]
+  /** The streams that have a clone of it. */
+  usedBy: string[]
+}
+/** A clone in a stream's home, and how far the making of it is. */
+export interface Clone {
+  name: string
+  path: string
+  state: 'cloning' | 'setting up' | 'ready' | 'failed'
+  branch: string | null
+  message: string | null
 }
 /** One agent's work on one feature, as the manager's run log keeps it (see the manager's Runs section). */
 export interface Run {
@@ -52,6 +72,9 @@ export interface Learning {
 export interface Project {
   id: string
   name: string
+  /** A list of repositories, or a stream: a unit of work with a home of its own that clones what it needs. */
+  kind?: 'project' | 'stream'
+  /** The primary repository, or a stream's home. */
   path: string
   repos: Repo[]
   defaultProfile: string | null

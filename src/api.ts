@@ -5,11 +5,13 @@ import type {
   AgentStatus,
   ChatMessage,
   ChatSummary,
+  Clone,
   Feature,
   Learning,
   Notes,
   Profile,
   Project,
+  Repository,
   Run,
   StoredItem,
   TurnImage,
@@ -84,6 +86,41 @@ export class Api {
   projects = () =>
     this.call<{ project: Project; agentCounts: Record<string, number> }[]>('GET', '/api/projects')
   project = (id: string) => this.call<{ project: Project }>('GET', `/api/projects/${id}`)
+  /** Starts a stream: a folder in the store, a home, no repositories until it clones some. */
+  createStream = (input: {
+    name: string
+    purpose?: string
+    defaultProfile?: string
+    delegation?: 'free' | 'on-request'
+  }) => this.call<{ project: Project }>('POST', '/api/streams', input)
+
+  repositories = () => this.call<{ repositories: Repository[] }>('GET', '/api/repositories')
+
+  putRepository = (name: string, input: { source?: string; setup?: string | null }) =>
+    this.call<{ repository: Repository }>(
+      'PUT',
+      `/api/repositories/${encodeURIComponent(name)}`,
+      input,
+    )
+
+  seedRepository = (name: string, input: { from: string; files: string[] }) =>
+    this.call<{ repository: Repository }>(
+      'PUT',
+      `/api/repositories/${encodeURIComponent(name)}/seed`,
+      input,
+    )
+
+  removeRepository = (name: string) =>
+    this.call<{ ok: true }>('DELETE', `/api/repositories/${encodeURIComponent(name)}`)
+
+  clones = (projectId: string) =>
+    this.call<{ clones: Clone[] }>('GET', `/api/projects/${encodeURIComponent(projectId)}/clones`)
+
+  useRepository = (projectId: string, repository: string) =>
+    this.call<{ clone: Clone }>('POST', `/api/projects/${encodeURIComponent(projectId)}/clones`, {
+      repository,
+    })
+
   /** Repos are absolute paths on the manager's machine (or the named host's, on a hub). */
   createProject = (input: {
     name: string

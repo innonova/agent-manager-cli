@@ -10,7 +10,15 @@ import { Events } from './events.js'
 import { agentFacts, bold, dim, renderItem, stateMark } from './render.js'
 import { answerTexts } from './quiet.js'
 import { statRows } from './stats.js'
-import type { Agent, ChatMessage, EventFrame, Item, StoredItem, TurnImage } from './types.js'
+import type {
+  Agent,
+  ChatMessage,
+  EventFrame,
+  Item,
+  Repository,
+  StoredItem,
+  TurnImage,
+} from './types.js'
 
 export interface Io {
   out: (line: string) => void
@@ -31,6 +39,25 @@ export const USAGE = `am — terminal client for agent-manager
   am project add-repo <project> <repo-path>...
   am project set <project> --delegation free|on-request   when agents may start other agents
   am project restart <project>   restart the idle agents so they see the new repos
+  am stream new <name> [--purpose TEXT] [--profile P] [--delegation free|on-request]
+                              start a stream: a unit of work that is not tied to a repository. It gets
+                              a folder of its own for its instructions, features and docs, and a home
+                              where its agents start and where it clones what it works on. The name is
+                              lower-case letters, digits and hyphens, and stays. The purpose is read
+                              from stdin when not given. A stream is listed, and its agents started,
+                              like a project's: am projects, am new <stream> <name>
+  am repos                    the repositories a stream can clone: where from, their setup, who uses them
+  am repo add <name> <source> [--setup CMD]
+                              register one, or change what is said about it: <source> is what git clone
+                              is given, --setup a command that makes a fresh clone a working one (npm ci)
+  am repo seed <name> --from <checkout> <file>...
+                              keep untracked files a clone needs (.env and the like), taken from a
+                              checkout on the manager's machine, to be copied into every new clone
+  am repo drop <name>         take one off the registry; clones of it stay where they are
+  am use <repository> [--stream S]
+                              clone a registered repository into the stream's home and set it up; waits
+                              and says how it went. Inside an agent's session the stream is its own
+  am clones [<stream>]        the clones in the stream's home, each with its branch
   am agents <project> [--archived]
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
                               [--host H]: run the agent's session on that machine (a spoke), with
@@ -210,7 +237,9 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
             .filter(([, n]) => n > 0)
             .map(([s, n]) => `${n} ${s}`)
             .join(', ')
-          io.out(`${bold(project.name)}  ${dim(project.id)}  ${counts ? dim(counts) : ''}`)
+          io.out(
+            `${bold(project.name)}  ${dim(project.id)}  ${project.kind === 'stream' ? dim(`stream · ${project.path}`) : ''}${counts ? dim(`  ${counts}`) : ''}`,
+          )
           for (const r of project.repos) io.out(`  ${r.name}  ${dim(r.path)}`)
           if (project.workspace)
             io.out(
@@ -221,6 +250,59 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       }
       case 'project':
         return await project(rest, io)
+      case 'stream':
+        return await stream(rest, io)
+      case 'repos': {
+        const api = client()
+        const { repositories } = await api.repositories()
+        if (repositories.length === 0)
+          io.out(dim('no repositories registered (am repo add <name> <source>)'))
+        for (const r of repositories) printRepository(r, io)
+        return 0
+      }
+      case 'repo':
+        return await repo(rest, io)
+      case 'use': {
+        const { values, positionals } = parseArgs({
+          args: rest,
+          allowPositionals: true,
+          options: { stream: { type: 'string' } },
+        })
+        const api = client()
+        const name = need(positionals[0], 'repository')
+        const project = await findProject(api, projectRef(values.stream))
+        await api.useRepository(project.id, name)
+        io.out(dim(`cloning ${name} into ${project.path} …`))
+        let said = ''
+        for (;;) {
+          const clone = (await api.clones(project.id)).clones.find((c) => c.name === name)
+          if (clone && clone.state !== said && clone.state === 'setting up')
+            io.out(dim('cloned; running its setup …'))
+          said = clone?.state ?? said
+          if (clone?.state === 'ready') {
+            io.out(`${bold(clone.name)}  ${clone.path}  ${dim(`on ${clone.branch ?? '?'}`)}`)
+            return 0
+          }
+          if (clone?.state === 'failed') {
+            io.err(clone.message ?? 'the clone failed')
+            return 1
+          }
+          await new Promise((r) => setTimeout(r, 500))
+        }
+      }
+      case 'clones': {
+        const api = client()
+        const project = await findProject(api, projectRef(rest[0]))
+        const { clones } = await api.clones(project.id)
+        if (clones.length === 0) io.out(dim(`no clones in ${project.path} (am use <repository>)`))
+        for (const c of clones) {
+          io.out(
+            `${bold(c.name)}  ${c.path}  ${dim(c.state === 'ready' ? `on ${c.branch ?? '?'}` : c.state)}`,
+          )
+          if (c.message) for (const l of c.message.split('\n')) io.out(`  ${dim(l)}`)
+        }
+        return 0
+      }
       case 'agents': {
         const { values, positionals } = parseArgs({
           args: rest,
@@ -726,6 +808,82 @@ async function project(rest: string[], io: Io): Promise<number> {
       throw new UsageError(
         sub ? `unknown project command "${sub}"` : 'project needs new, add-repo, set or restart',
       )
+  }
+}
+
+function printRepository(r: Repository, io: Io): void {
+  io.out(`${bold(r.name)}  ${r.source}`)
+  if (r.setup) io.out(`  ${dim('setup')}  ${r.setup}`)
+  if (r.seed.length) io.out(`  ${dim('seed')}   ${r.seed.join(', ')}`)
+  if (r.usedBy.length) io.out(`  ${dim('used by')}  ${r.usedBy.join(', ')}`)
+}
+
+async function stream(rest: string[], io: Io): Promise<number> {
+  const [sub, ...args] = rest
+  if (sub !== 'new') throw new UsageError('am stream new <name> [--purpose TEXT]')
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: {
+      purpose: { type: 'string' },
+      profile: { type: 'string' },
+      delegation: { type: 'string' },
+    },
+  })
+  const api = client()
+  const purpose = values.purpose ?? (await io.stdin?.())?.trim() ?? ''
+  const { project } = await api.createStream({
+    name: need(positionals[0], 'name'),
+    ...(purpose ? { purpose } : {}),
+    ...(values.profile ? { defaultProfile: values.profile } : {}),
+    ...(values.delegation ? { delegation: parseDelegation(values.delegation) } : {}),
+  })
+  io.out(`${bold(project.name)}  ${dim(project.id)}`)
+  io.out(`  ${dim('home')}    ${project.path}`)
+  for (const r of project.repos) if (r.folder) io.out(`  ${dim('folder')}  ${r.path}`)
+  return 0
+}
+
+async function repo(rest: string[], io: Io): Promise<number> {
+  const [sub, ...args] = rest
+  const api = client()
+  switch (sub) {
+    case 'add': {
+      const { values, positionals } = parseArgs({
+        args,
+        allowPositionals: true,
+        options: { setup: { type: 'string' } },
+      })
+      const { repository } = await api.putRepository(need(positionals[0], 'name'), {
+        source: need(positionals[1], 'source'),
+        ...(values.setup !== undefined ? { setup: values.setup || null } : {}),
+      })
+      printRepository(repository, io)
+      return 0
+    }
+    case 'seed': {
+      const { values, positionals } = parseArgs({
+        args,
+        allowPositionals: true,
+        options: { from: { type: 'string' } },
+      })
+      const [name, ...files] = positionals
+      if (!values.from || files.length === 0)
+        throw new UsageError('am repo seed <name> --from <checkout> <file>...')
+      const { repository } = await api.seedRepository(need(name, 'name'), {
+        from: path.resolve(values.from),
+        files,
+      })
+      printRepository(repository, io)
+      return 0
+    }
+    case 'drop': {
+      await api.removeRepository(need(args[0], 'name'))
+      io.out('dropped')
+      return 0
+    }
+    default:
+      throw new UsageError('am repo add|seed|drop …  (am help)')
   }
 }
 
