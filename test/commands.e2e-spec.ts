@@ -511,6 +511,11 @@ describe('plain commands', () => {
       delete process.env.AGENT_MANAGER_TOKEN
       delete process.env.AGENT_MANAGER_PROJECT
     }
+    // a fork needs a conversation the vendor wrote down, which the fake agent has none of: refused, with why
+    const forked = await am(['fork', 'sorter', 'second', '--into', 'spring-clean'])
+    expect(forked.code).toBe(1)
+    expect(forked.err.join('\n')).toMatch(/no conversation to copy yet/)
+    expect((await am(['fork', 'sorter'])).code).toBe(2)
     expect((await am(['repo', 'drop', 'cellar'])).text).toContain('dropped')
     expect(fs.existsSync(path.join(home, 'cellar', '.git'))).toBe(true) // the clone stays
   }, 60000)

@@ -93,6 +93,13 @@ export const USAGE = `am — terminal client for agent-manager
                               --nudge: when it stops with work left, the manager asks it a few minutes
                               later whether it can go on, and pages the people if it needs them
   am restart <agent>          stop and resume with the current settings; refused while busy
+  am fork <agent> <name> [--into <project or stream>]
+                              a new agent that begins with that one's whole conversation as it
+                              stands, in the same project or in another one or a stream. The
+                              original carries on untouched; the copy is told it is one, and where
+                              it now is. How work that grew out of a conversation gets a place of
+                              its own without being explained from nothing. Claude agents on the
+                              manager's machine, between turns
   am stats [<agent>]          how the agent has been run: runtime and turns, tokens and cost, who started
                               the turns, the work since a person last wrote, the runs between
                               messages, and how much went on unattended. Inside an agent's session
@@ -490,6 +497,24 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { agent } = await findAgent(api, need(rest[0], 'agent'))
         await api.restart(agent.id)
         io.out('restarted')
+        return 0
+      }
+      case 'fork': {
+        const { values, positionals } = parseArgs({
+          args: rest,
+          allowPositionals: true,
+          options: { into: { type: 'string' } },
+        })
+        const api = client()
+        const { agent } = await findAgent(api, need(positionals[0], 'agent'))
+        const into = values.into ? await findProject(api, values.into) : null
+        const made = await api.fork(agent.id, {
+          name: need(positionals[1], 'name'),
+          ...(into ? { projectId: into.id } : {}),
+        })
+        io.out(
+          `${bold(made.agent.name)}  ${dim(made.agent.id)}  ${dim(`a fork of ${agent.name}, in ${made.agent.cwd}; ${made.inherited} exchange${made.inherited === 1 ? '' : 's'} of its dialog carried over`)}`,
+        )
         return 0
       }
       case 'stats': {
