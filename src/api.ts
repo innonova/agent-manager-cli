@@ -3,9 +3,13 @@ import type {
   AgentRow,
   AgentStats,
   AgentStatus,
+  ArchivePlan,
+  ArchiveStatus,
   ChatMessage,
   ChatSummary,
   Clone,
+  Exchange,
+  ExchangeLine,
   Feature,
   Learning,
   Notes,
@@ -16,8 +20,6 @@ import type {
   StoredItem,
   TurnImage,
   User,
-  Exchange,
-  ExchangeLine,
 } from './types.js'
 
 export class ApiError extends Error {
@@ -83,8 +85,35 @@ export class Api {
     this.call<{ user: User; agent?: { id: string; projectId: string } }>('GET', '/api/auth/me')
   health = () => this.call<{ status: string; daemon: boolean }>('GET', '/api/health')
 
-  projects = () =>
-    this.call<{ project: Project; agentCounts: Record<string, number> }[]>('GET', '/api/projects')
+  /** The projects and streams that are there; with `archived`, the streams that are put away instead. */
+  projects = (archived = false) =>
+    this.call<{ project: Project; agentCounts: Record<string, number> }[]>(
+      'GET',
+      `/api/projects${archived ? '?archived=1' : ''}`,
+    )
+  /** What putting a stream away would do, and what stands in its way. */
+  archivePlan = (projectId: string) =>
+    this.call<{ plan: ArchivePlan }>(
+      'GET',
+      `/api/projects/${encodeURIComponent(projectId)}/archive/plan`,
+    )
+  /** Where a stream is, and how the last attempt to put it away or bring it back went. */
+  archiveStatus = (projectId: string) =>
+    this.call<ArchiveStatus>('GET', `/api/projects/${encodeURIComponent(projectId)}/archive`)
+  /** Puts a stream away; answers at once, `archiveStatus` says how far it is. */
+  archiveStream = (projectId: string, input: { discard?: boolean; compact?: boolean }) =>
+    this.call<{ project: Project }>(
+      'POST',
+      `/api/projects/${encodeURIComponent(projectId)}/archive`,
+      input,
+    )
+  /** Brings a stream back; answers at once. */
+  reviveStream = (projectId: string) =>
+    this.call<{ project: Project }>(
+      'POST',
+      `/api/projects/${encodeURIComponent(projectId)}/revive`,
+      {},
+    )
   project = (id: string) => this.call<{ project: Project }>('GET', `/api/projects/${id}`)
   /** Starts a stream: a folder in the store, a home, no repositories until it clones some. */
   createStream = (input: {

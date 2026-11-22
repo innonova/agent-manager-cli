@@ -506,6 +506,7 @@ describe('plain commands', () => {
       expect(fs.existsSync(path.join(home, 'cellar', '.git'))).toBe(true)
       expect((await am(['stream', 'new', 'another'])).code).toBe(1) // starting a stream is a person's
       expect((await am(['repo', 'drop', 'cellar'])).code).toBe(1) // and so is dropping a repository
+      expect((await am(['stream', 'archive', 'spring-clean'])).code).toBe(1) // and putting its stream away
     } finally {
       delete process.env.AGENT_MANAGER_URL
       delete process.env.AGENT_MANAGER_TOKEN
@@ -518,5 +519,40 @@ describe('plain commands', () => {
     expect((await am(['fork', 'sorter'])).code).toBe(2)
     expect((await am(['repo', 'drop', 'cellar'])).text).toContain('dropped')
     expect(fs.existsSync(path.join(home, 'cellar', '.git'))).toBe(true) // the clone stays
-  }, 60000)
+
+    // putting the stream away: a file nobody committed stands in the way, and is named
+    fs.writeFileSync(path.join(home, 'attic', 'notes.txt'), 'found under the eaves\n')
+    const plan = await am(['stream', 'archive', 'spring-clean', '--plan'])
+    expect([plan.code, plan.err]).toEqual([0, []])
+    expect(plan.text).toMatch(/spring-clean {2}2 clones, under 1 MB to reclaim/)
+    expect(plan.text).toContain('attic: 1 file (notes.txt)')
+    expect(plan.text).toContain('sorter  not compacted: ')
+    const refused = await am(['stream', 'archive', 'spring-clean'])
+    expect(refused.code).toBe(1)
+    expect(refused.err.join('\n')).toContain(
+      'attic: 1 file not committed (notes.txt) would be lost',
+    )
+    expect(fs.existsSync(path.join(home, 'attic', 'notes.txt'))).toBe(true)
+    const away = await am(['stream', 'archive', 'spring-clean', '--discard'])
+    expect([away.code, away.err]).toEqual([0, []])
+    expect(away.text).toMatch(
+      /put away by admin: 2 clones removed \(under 1 MB\), 0 of 1 agent compacted/,
+    )
+    expect(fs.existsSync(path.join(home, 'attic'))).toBe(false)
+    expect(fs.existsSync(path.join(home, 'AGENTS.md'))).toBe(true)
+    expect((await am(['projects'])).text).not.toContain('spring-clean')
+    expect((await am(['projects', '--archived'])).text).toMatch(
+      /spring-clean .*put away \d{4}-\d\d-\d\d · am stream revive spring-clean/,
+    )
+    expect((await am(['turn', 'sorter', 'anyone there?'])).code).toBe(1)
+    // and back: the clones made again (cellar from where it came, the registry no longer knowing it)
+    const back = await am(['stream', 'revive', 'spring-clean'])
+    expect([back.code, back.err]).toEqual([0, []])
+    expect(back.text).toMatch(/brought back by admin after \d+ minutes?: 2 of 2 clones made again/)
+    expect(fs.readFileSync(path.join(home, 'attic', '.ready'), 'utf8')).toBe('KEY=1\n')
+    expect(fs.existsSync(path.join(home, 'cellar', '.git'))).toBe(true)
+    expect(fs.existsSync(path.join(home, 'attic', 'notes.txt'))).toBe(false)
+    expect((await am(['projects', '--archived'])).text).toContain('no stream is put away')
+    expect((await am(['stream', 'revive', 'spring-clean'])).code).toBe(1)
+  }, 90000)
 })

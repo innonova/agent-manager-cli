@@ -12,6 +12,7 @@ import { answerTexts } from './quiet.js'
 import { statRows } from './stats.js'
 import type {
   Agent,
+  ArchiveStatus,
   ChatMessage,
   EventFrame,
   Item,
@@ -46,6 +47,18 @@ export const USAGE = `am — terminal client for agent-manager
                               lower-case letters, digits and hyphens, and stays. The purpose is read
                               from stdin when not given. A stream is listed, and its agents started,
                               like a project's: am projects, am new <stream> <name>
+  am stream archive <name> [--plan] [--discard] [--no-compact]
+                              put a stream away: its folder, its agents and everything kept of them
+                              stay, its clones come off the disk. Refused, saying what, while work
+                              exists only in a clone or an agent is in a turn; branches with commits
+                              no remote has are pushed first. --plan only says what it would do;
+                              --discard lets files that are not committed go with the clones;
+                              --no-compact leaves the agents' contexts as they are (an agent that
+                              was active within the hour is otherwise compacted first, while that is
+                              cheap). A person's to do, not an agent's.
+  am stream revive <name>     bring it back: its clones are made again and set up, and each agent is
+                              told at its next start how long it was away and what landed meanwhile
+  am projects --archived      the streams that are put away
   am repos                    the repositories a stream can clone: where from, their setup, who uses them
   am repo add <name> <source> [--setup CMD]
                               register one, or change what is said about it: <source> is what git clone
@@ -241,6 +254,15 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
       }
       case 'projects': {
         const api = client()
+        if (rest.includes('--archived')) {
+          const away = await api.projects(true)
+          if (away.length === 0) io.out(dim('no stream is put away'))
+          for (const { project } of away)
+            io.out(
+              `${bold(project.name)}  ${dim(project.id)}  ${dim(`put away ${project.archive ? new Date(project.archive.at).toISOString().slice(0, 10) : ''} · am stream revive ${project.name}`)}`,
+            )
+          return 0
+        }
         for (const { project, agentCounts } of await api.projects()) {
           const counts = Object.entries(agentCounts)
             .filter(([, n]) => n > 0)
@@ -861,9 +883,113 @@ function printRepository(r: Repository, io: Io): void {
   if (r.usedBy.length) io.out(`  ${dim('used by')}  ${r.usedBy.join(', ')}`)
 }
 
+const megabytes = (kb: number) =>
+  kb >= 1024 * 1024
+    ? `${(kb / 1024 / 1024).toFixed(1)} GB`
+    : kb < 512
+      ? 'under 1 MB'
+      : `${Math.round(kb / 1024)} MB`
+
+/** Follows a stream on its way there or back, a line per step, until it has arrived or failed. */
+async function followArchive(
+  api: Api,
+  projectId: string,
+  arrived: (s: ArchiveStatus) => boolean,
+  io: Io,
+): Promise<number> {
+  let said = ''
+  for (;;) {
+    const s = await api.archiveStatus(projectId)
+    if (s.progress.error) {
+      io.err(s.progress.error)
+      return 1
+    }
+    if (s.progress.step && s.progress.step !== said && s.progress.step !== 'beginning')
+      io.out(dim(`  ${s.progress.step}`))
+    said = s.progress.step ?? said
+    if (arrived(s) && !s.progress.step) {
+      io.out(s.progress.done ?? 'done')
+      return 0
+    }
+    await new Promise((r) => setTimeout(r, 500))
+  }
+}
+
 async function stream(rest: string[], io: Io): Promise<number> {
   const [sub, ...args] = rest
-  if (sub !== 'new') throw new UsageError('am stream new <name> [--purpose TEXT]')
+  if (sub === 'archive') {
+    const { values, positionals } = parseArgs({
+      args,
+      allowPositionals: true,
+      options: {
+        plan: { type: 'boolean' },
+        discard: { type: 'boolean' },
+        'no-compact': { type: 'boolean' },
+      },
+    })
+    const api = client()
+    const project = await findProject(api, need(positionals[0], 'name'))
+    if (values.plan) {
+      const { plan } = await api.archivePlan(project.id)
+      io.out(
+        `${bold(project.name)}  ${dim(`${plan.clones.length} clone${plan.clones.length === 1 ? '' : 's'}, ${megabytes(plan.reclaimKb)} to reclaim`)}`,
+      )
+      for (const c of plan.clones)
+        io.out(
+          `  ${c.name}  ${dim(`on ${c.branch ?? 'a detached HEAD'} · ${megabytes(c.sizeKb)}`)}`,
+        )
+      for (const p of plan.pushes)
+        io.out(
+          `  ${dim('pushed first')}  ${p.clone}: ${p.branch} (${p.commits} commit${p.commits === 1 ? '' : 's'} no remote has)`,
+        )
+      for (const u of plan.uncommitted)
+        io.out(
+          `  ${dim('lost unless committed (--discard lets them go)')}  ${u.clone}: ${[
+            u.count
+              ? `${u.count} file${u.count === 1 ? '' : 's'} (${u.files.slice(0, 8).join(', ')}${u.count > 8 ? ', …' : ''})`
+              : '',
+            u.stashes ? `${u.stashes} stashed change${u.stashes === 1 ? '' : 's'}` : '',
+          ]
+            .filter(Boolean)
+            .join(' and ')}`,
+        )
+      for (const n of plan.unreachable)
+        io.out(
+          `  ${dim('its remote could not be asked; judged by what the clone last knew')}  ${n}`,
+        )
+      for (const a of plan.agents)
+        io.out(
+          `  ${a.name}  ${dim(`${a.compact ? 'compacted first' : 'not compacted'}: ${a.why}`)}`,
+        )
+      if (plan.blocked.length) {
+        io.out('in the way:')
+        for (const b of plan.blocked) io.out(`  - ${b}`)
+        return 1
+      }
+      return 0
+    }
+    await api.archiveStream(project.id, {
+      ...(values.discard ? { discard: true } : {}),
+      ...(values['no-compact'] ? { compact: false } : {}),
+    })
+    io.out(dim(`putting ${project.name} away …`))
+    return await followArchive(api, project.id, (s) => s.archive?.state === 'archived', io)
+  }
+  if (sub === 'revive') {
+    const api = client()
+    const name = need(args[0], 'name')
+    const away = (await api.projects(true)).map((r) => r.project)
+    const project = away.find((p) => p.id === name) ?? away.find((p) => p.name === name)
+    if (!project)
+      throw new Error(`no stream "${name}" is put away (am projects --archived lists them)`)
+    await api.reviveStream(project.id)
+    io.out(dim(`bringing ${project.name} back …`))
+    return await followArchive(api, project.id, (s) => !s.archive, io)
+  }
+  if (sub !== 'new')
+    throw new UsageError(
+      'am stream new <name> [--purpose TEXT] | am stream archive <name> [--plan] [--discard] [--no-compact] | am stream revive <name>',
+    )
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,

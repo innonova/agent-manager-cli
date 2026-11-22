@@ -76,6 +76,8 @@ export interface Project {
   name: string
   /** A list of repositories, or a stream: a unit of work with a home of its own that clones what it needs. */
   kind?: 'project' | 'stream'
+  /** A stream that is put away, or on its way there or back, and since when; null when it is simply there. */
+  archive?: { state: 'archiving' | 'archived' | 'reviving'; at: number } | null
   /** The primary repository, or a stream's home. */
   path: string
   repos: Repo[]
@@ -303,4 +305,27 @@ export interface AgentStats {
     longestMs: number
     medianMs: number
   }
+}
+
+/** What putting a stream away would do, and what stands in its way. */
+export interface ArchivePlan {
+  blocked: string[]
+  uncommitted: { clone: string; count: number; files: string[]; stashes: number }[]
+  pushes: { clone: string; branch: string; commits: number }[]
+  unreachable: string[]
+  clones: { name: string; branch: string | null; head: string | null; sizeKb: number }[]
+  agents: { id: string; name: string; state: string; compact: boolean; why: string }[]
+  reclaimKb: number
+}
+
+/** Where a stream is, and how the last attempt to move it went. */
+export interface ArchiveStatus {
+  archive: Project['archive']
+  progress: { step: string | null; error: string | null; done: string | null }
+  record: {
+    archivedAt: number
+    by: string
+    clones: { name: string; branch: string | null; head: string | null }[]
+    agents: { name: string; compacted: boolean }[]
+  } | null
 }
