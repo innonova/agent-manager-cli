@@ -901,6 +901,8 @@ async function followArchive(
   for (;;) {
     const s = await api.archiveStatus(projectId)
     if (s.progress.error) {
+      // put away, with something left on the disk: both are said
+      if (arrived(s) && s.progress.done) io.out(s.progress.done)
       io.err(s.progress.error)
       return 1
     }
@@ -952,10 +954,6 @@ async function stream(rest: string[], io: Io): Promise<number> {
           ]
             .filter(Boolean)
             .join(' and ')}`,
-        )
-      for (const n of plan.unreachable)
-        io.out(
-          `  ${dim('its remote could not be asked; judged by what the clone last knew')}  ${n}`,
         )
       for (const a of plan.agents)
         io.out(

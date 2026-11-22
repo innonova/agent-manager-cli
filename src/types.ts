@@ -312,7 +312,6 @@ export interface ArchivePlan {
   blocked: string[]
   uncommitted: { clone: string; count: number; files: string[]; stashes: number }[]
   pushes: { clone: string; branch: string; commits: number }[]
-  unreachable: string[]
   clones: { name: string; branch: string | null; head: string | null; sizeKb: number }[]
   agents: { id: string; name: string; state: string; compact: boolean; why: string }[]
   reclaimKb: number
