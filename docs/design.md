@@ -119,6 +119,10 @@ session the agent is itself; elsewhere `--agent` names it.
 UI's statistics dialog shows, each with its definition under it
 (`src/stats.ts`, a copy of the UI's wording).
 
+`am set <agent> --nudge` turns on, for that agent, the manager's
+question when it stops (agent-manager's design, "Nudge"); `--no-nudge`
+turns it off, and the agent's facts say when it is on.
+
 `am compact <agent>` asks the manager to compact an agent's context
 now: the dialog is weighed first when it has grown since the last
 time, then the vendor's own compaction is sent as a turn. It is the

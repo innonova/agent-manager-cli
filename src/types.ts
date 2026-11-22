@@ -81,6 +81,8 @@ export interface Agent {
   createdAt: number
   archivedAt: number | null
   permissions: 'bypass' | 'ask'
+  /** When it stops, the manager asks it whether it can go on. */
+  nudge?: boolean
   model: string | null
   effort: string | null
 }

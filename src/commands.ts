@@ -61,8 +61,10 @@ export const USAGE = `am — terminal client for agent-manager
                               to edit and send again; a Claude agent forgets it and its reply (work on disk stays)
   am interrupt <agent>        stop the turn under way; the agent stays and takes the next message
   am stop <agent>             end the session (its process); the next message resumes it
-  am set <agent> [--name N] [--model M] [--effort E] [--ask|--bypass]
-                              edit the agent; model, effort and permissions apply at its next restart
+  am set <agent> [--name N] [--model M] [--effort E] [--ask|--bypass] [--nudge|--no-nudge]
+                              edit the agent; model, effort and permissions apply at its next restart.
+                              --nudge: when it stops with work left, the manager asks it a few minutes
+                              later whether it can go on, and pages the people if it needs them
   am restart <agent>          stop and resume with the current settings; refused while busy
   am stats [<agent>]          how the agent has been run: runtime and turns, tokens and cost, who started
                               the turns, the work since a person last wrote, the runs between
@@ -324,18 +326,24 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
             effort: { type: 'string' },
             ask: { type: 'boolean' },
             bypass: { type: 'boolean' },
+            nudge: { type: 'boolean' },
+            'no-nudge': { type: 'boolean' },
           },
         })
         const api = client()
         const { agent } = await findAgent(api, need(positionals[0], 'agent'))
         const patch: Parameters<typeof api.updateAgent>[1] = {}
+        if (values.nudge) patch.nudge = true
+        else if (values['no-nudge']) patch.nudge = false
         if (values.name !== undefined) patch.name = values.name
         if (values.model !== undefined) patch.model = values.model || null
         if (values.effort !== undefined) patch.effort = values.effort || null
         if (values.ask) patch.permissions = 'ask'
         else if (values.bypass) patch.permissions = 'bypass'
         if (Object.keys(patch).length === 0)
-          throw new Error('nothing to set (--name, --model, --effort, --ask, --bypass)')
+          throw new Error(
+            'nothing to set (--name, --model, --effort, --ask, --bypass, --nudge, --no-nudge)',
+          )
         const r = await api.updateAgent(agent.id, patch)
         io.out(agentFacts(r.agent, r.status))
         if (r.appliesAtRestart.length)

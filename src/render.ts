@@ -274,6 +274,7 @@ export function agentFacts(agent: Agent, status: AgentStatus): string {
       : '',
     agent.effort ? `effort ${agent.effort}` : '',
     agent.permissions === 'ask' ? 'asks' : '',
+    agent.nudge ? 'asked to go on when it stops' : '',
     agent.cwd,
   ]
     .filter(Boolean)

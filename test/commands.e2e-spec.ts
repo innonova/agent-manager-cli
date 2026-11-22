@@ -338,6 +338,9 @@ describe('plain commands', () => {
       /an agent's own/,
     )
     expect((await am(['recall', '--agent', 'talker', '1'])).text).toContain('token please')
+    // asked whether it can go on when it stops: a setting of the agent, on and off
+    expect((await am(['set', 'talker', '--nudge'])).text).toContain('asked to go on when it stops')
+    expect((await am(['set', 'talker', '--no-nudge'])).text).not.toContain('asked to go on')
     // how the agent has been run, in rows a terminal can show
     const stats = await am(['stats', 'talker'])
     expect(stats.out[0]).toMatch(/runtime +\d+ (s|min) in \d+ turns, since /)

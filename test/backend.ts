@@ -36,6 +36,7 @@ export async function startBackend(): Promise<Backend> {
   const env = { ...process.env }
   delete env.ELECTRON_RUN_AS_NODE
   env.AGENT_MANAGER_DIALOG_CLASSIFIER = 'off' // no model call on the developer's account
+  env.AGENT_MANAGER_NUDGE_READER = 'off' // nor for reading a stopped agent's last message
   const procs: ChildProcess[] = []
   const waitFor = (proc: ChildProcess, re: RegExp, what: string) =>
     new Promise<string>((resolve, reject) => {

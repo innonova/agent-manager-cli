@@ -157,6 +157,7 @@ export class Api {
       model?: string | null
       effort?: string | null
       permissions?: 'bypass' | 'ask'
+      nudge?: boolean
     },
   ) =>
     this.call<{ agent: AgentRow['agent']; status: AgentStatus; appliesAtRestart: string[] }>(
