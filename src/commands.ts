@@ -54,9 +54,11 @@ export const USAGE = `am — terminal client for agent-manager
                               keep untracked files a clone needs (.env and the like), taken from a
                               checkout on the manager's machine, to be copied into every new clone
   am repo drop <name>         take one off the registry; clones of it stay where they are
-  am use <repository> [--stream S]
+  am use <repository> [--stream S] [--again]
                               clone a registered repository into the stream's home and set it up; waits
-                              and says how it went. Inside an agent's session the stream is its own
+                              and says how it went. Inside an agent's session the stream is its own.
+                              --again: the clone is there and its setup failed or was cut short; run
+                              the setup once more (it is never run again by itself)
   am clones [<stream>]        the clones in the stream's home, each with its branch
   am agents <project> [--archived]
   am new <project> <name> [--profile P] [--ask] [--cwd REPO] [--model M] [--effort E]
@@ -273,13 +275,19 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { values, positionals } = parseArgs({
           args: rest,
           allowPositionals: true,
-          options: { stream: { type: 'string' } },
+          options: { stream: { type: 'string' }, again: { type: 'boolean' } },
         })
         const api = client()
         const name = need(positionals[0], 'repository')
         const project = await findProject(api, projectRef(values.stream))
-        await api.useRepository(project.id, name)
-        io.out(dim(`cloning ${name} into ${project.path} …`))
+        await api.useRepository(project.id, name, values.again ?? false)
+        io.out(
+          dim(
+            values.again
+              ? `running the setup of ${name} again …`
+              : `cloning ${name} into ${project.path} …`,
+          ),
+        )
         let said = ''
         for (;;) {
           const clone = (await api.clones(project.id)).clones.find((c) => c.name === name)

@@ -116,9 +116,11 @@ export class Api {
   clones = (projectId: string) =>
     this.call<{ clones: Clone[] }>('GET', `/api/projects/${encodeURIComponent(projectId)}/clones`)
 
-  useRepository = (projectId: string, repository: string) =>
+  /** Clones a registered repository into the stream's home; with `again`, runs the setup of a clone that is there once more. */
+  useRepository = (projectId: string, repository: string, again = false) =>
     this.call<{ clone: Clone }>('POST', `/api/projects/${encodeURIComponent(projectId)}/clones`, {
       repository,
+      ...(again ? { again: true } : {}),
     })
 
   /** Repos are absolute paths on the manager's machine (or the named host's, on a hub). */
