@@ -653,8 +653,20 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         }
         for (const r of runs) {
           const mins = r.endedAt ? `${Math.round((r.endedAt - r.startedAt) / 60000)} min` : 'open'
-          const commits =
-            r.baseCommit && r.endCommit
+          // a stream's work is in its clones: the range in each that moved; a project's is its repository's
+          const moved = (r.clones ?? []).filter((c) => c.end && c.base !== c.end)
+          const commits = r.clones?.length
+            ? moved.length
+              ? moved
+                  .map(
+                    (c) =>
+                      `${c.name} ${c.base ? `${c.base.slice(0, 7)}..` : ''}${c.end!.slice(0, 7)}`,
+                  )
+                  .join(', ')
+              : r.endedAt
+                ? '(no commit)'
+                : ''
+            : r.baseCommit && r.endCommit
               ? r.baseCommit === r.endCommit
                 ? `${r.baseCommit.slice(0, 7)} (no commit)`
                 : `${r.baseCommit.slice(0, 7)}..${r.endCommit.slice(0, 7)}`

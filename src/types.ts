@@ -47,6 +47,8 @@ export interface Run {
   featureStatus: string | null
   outcome: string | null
   baseCommit: string | null
+  /** For a stream's feature: where each of the stream's clones stood when the run began and ended; empty or absent for a project. */
+  clones?: { name: string; base: string | null; end: string | null }[]
   endCommit: string | null
   turns: number | null
   inputTokens: number | null
