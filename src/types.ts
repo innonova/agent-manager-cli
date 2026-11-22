@@ -26,6 +26,8 @@ export interface Clone {
   state: 'cloning' | 'setting up' | 'ready' | 'failed'
   branch: string | null
   message: string | null
+  /** What of it is not on the repository's main, as the clone last fetched it. */
+  landing?: { main: string; unlanded: number; behind: number; uncommitted: number } | null
 }
 /** One agent's work on one feature, as the manager's run log keeps it (see the manager's Runs section). */
 export interface Run {

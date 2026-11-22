@@ -296,8 +296,18 @@ export async function run(argv: string[], io: Io = stdIo()): Promise<number> {
         const { clones } = await api.clones(project.id)
         if (clones.length === 0) io.out(dim(`no clones in ${project.path} (am use <repository>)`))
         for (const c of clones) {
+          const l = c.landing
+          const landing = l
+            ? [
+                l.unlanded ? `${l.unlanded} not on main` : '',
+                l.uncommitted ? `${l.uncommitted} not committed` : '',
+                l.behind ? `${l.behind} behind` : '',
+              ]
+                .filter(Boolean)
+                .join(', ') || 'everything landed'
+            : ''
           io.out(
-            `${bold(c.name)}  ${c.path}  ${dim(c.state === 'ready' ? `on ${c.branch ?? '?'}` : c.state)}`,
+            `${bold(c.name)}  ${c.path}  ${dim(c.state === 'ready' ? `on ${c.branch ?? '?'}` : c.state)}${landing ? dim(`  ${landing}`) : ''}`,
           )
           if (c.message) for (const l of c.message.split('\n')) io.out(`  ${dim(l)}`)
         }

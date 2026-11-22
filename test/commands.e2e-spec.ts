@@ -476,7 +476,7 @@ describe('plain commands', () => {
     expect(used.text).toContain(`attic  ${path.join(home, 'attic')}  on main`)
     expect(fs.readFileSync(path.join(home, 'attic', '.ready'), 'utf8')).toBe('KEY=1\n')
     expect((await am(['clones', 'spring-clean'])).text).toContain(
-      `attic  ${path.join(home, 'attic')}  on main`,
+      `attic  ${path.join(home, 'attic')}  on main  everything landed`,
     )
     expect((await am(['repos'])).text).toContain('used by  spring-clean')
     expect((await am(['use', 'attic', '--stream', 'spring-clean'])).code).toBe(1) // one clone per stream
